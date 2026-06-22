@@ -1,0 +1,9 @@
+{
+  "vonr":     {"service": "VoNR",       "sinr_min_db": -3,  "throughput_min_mbps": 0.05,  "latency_max_ms": 100, "packet_loss_max": 0.01, "priority": 1},
+  "video_hd": {"service": "Video HD",    "sinr_min_db": 5,   "throughput_min_mbps": 5,     "latency_max_ms": 150, "packet_loss_max": 0.01, "priority": 2},
+  "video_4k": {"service": "Video 4K",    "sinr_min_db": 10,  "throughput_min_mbps": 25,    "latency_max_ms": 100, "packet_loss_max": 0.001,"priority": 3},
+  "data":     {"service": "Data",        "sinr_min_db": 0,   "throughput_min_mbps": 1,     "latency_max_ms": 500, "packet_loss_max": 0.05, "priority": 4},
+  "gaming":   {"service": "Gaming",      "sinr_min_db": 8,   "throughput_min_mbps": 10,    "latency_max_ms": 20,  "packet_loss_max": 0.001,"priority": 1},
+  "iot":      {"service": "IoT",         "sinr_min_db": -5,  "throughput_min_mbps": 0.01,  "latency_max_ms": 1000,"packet_loss_max": 0.1,  "priority": 5},
+  "_mixed": {"service": "Mixed (default)", "services": ["vonr", "data", "video_hd"]}
+}

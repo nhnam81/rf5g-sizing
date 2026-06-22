@@ -1,0 +1,40 @@
+# Data files
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Temp/test files
+inspect_map.html
+inspect_map.py
+test_*.py
+verify_*.py
+check_*.py
+extract_*.py
+patch_*.py
+retrain_*.py
+create_*.ps1
+
+# Large binary files (datasheets)
+Radio and Anten Product/**/*.pdf
+Radio and Anten Product/**/*.txt
+Radio and Anten Product/**/*.msi
+Radio and Anten Product/**/*.MSI
+Radio and Anten Product/**/*.zip
+Radio and Anten Product/**/SingleColumn-Pattern/
+Radio and Anten Product/**/*_Atoll*/
+Radio and Anten Product/**/*_MSI*/
+
+# Keep catalog JSON
+!radio_antenna_catalog.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store

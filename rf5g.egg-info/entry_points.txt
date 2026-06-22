@@ -1,0 +1,2 @@
+[console_scripts]
+rf5g = rf5g.cli:app

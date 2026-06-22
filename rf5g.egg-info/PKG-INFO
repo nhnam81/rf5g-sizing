@@ -1,0 +1,33 @@
+Metadata-Version: 2.4
+Name: rf5g
+Version: 0.1.0
+Summary: 5G NR RF Coverage Sizing Tool — 3GPP TR 38.901 propagation models, link budget, site estimation, QoS verification
+Author: nhnam
+License: MIT
+Keywords: 5g,nr,rf,coverage,sizing,propagation,3gpp
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Telecommunications Industry
+Classifier: Topic :: Scientific/Engineering :: Telecommunications
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Requires-Dist: typer>=0.9
+Requires-Dist: rich>=13.0
+Requires-Dist: numpy>=1.24
+Requires-Dist: scipy>=1.11
+Requires-Dist: pyyaml>=6.0
+Provides-Extra: viz
+Requires-Dist: folium>=0.14; extra == "viz"
+Requires-Dist: matplotlib>=3.7; extra == "viz"
+Requires-Dist: jinja2>=3.1; extra == "viz"
+Provides-Extra: web
+Requires-Dist: fastapi>=0.100; extra == "web"
+Requires-Dist: uvicorn>=0.23; extra == "web"
+Requires-Dist: streamlit>=1.25; extra == "web"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0; extra == "dev"
+Requires-Dist: hypothesis>=6.80; extra == "dev"
