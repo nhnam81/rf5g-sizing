@@ -1,13 +1,23 @@
 # 5G RF Coverage Sizing Tool — PRD (Product Requirements Document)
 
-> **Version:** 1.1 | **Date:** 2026-06-22
-> **Status:** Updated — Drag-and-drop sites, Shadow fading fix, WGS84 haversine
+> **Version:** 1.2 | **Date:** 2026-06-22
+> **Status:** Updated — streamlit-folium, Manual sector input, Antenna catalog, Map rendering fix
 > **Author:** OpenClaw Agent | **Owner:** nhnam
+>
+> **v1.2 changes:**
+> - FR-10: Manual site input: lat,lon,azimuth,beamwidth per line (6 decimal precision)
+> - FR-11: Radio/Antenna catalog dropdown (5 radios, 9 antennas) with auto-override
+> - FR-12: Capacity sites map view, area verification, sector directionality warning
+> - FR-13: streamlit-folium rendering (replaces st.components.v1.html — fixes blank map)
+> - FR-14: Manual sector wedge drawing with cosine pattern generation
+> - Bug fix: AntennaPattern empty horizontal_pattern → uses _cosine_pattern for sector beamwidth
+> - Bug fix: Folium height=100% → height=600px (blank map in Streamlit iframe)
+> - Bug fix: rf5gConfig JS init timing (setTimeout + window search for Leaflet map)
 >
 > **v1.1 changes:**
 > - FR-09: Added drag-and-drop site placement with WGS84 (EPSG:4326) haversine conversion
 > - FR-09: Added site import/export (JSON/CSV) CLI and API endpoints
-> - 6.3: Shadow fading now uses 3GPP TR 38.901 Table 7.4.2-1 sigma × z-score (was fixed table)
+> - 6.3: Shadow fading now uses 3GPP TR 38.901 Table 7.4.2-1 sigma × z-score
 > - 6.4: Added drag-and-drop map validation test cases
 > - Architecture: Added web/ (Guided + Basic Streamlit), sites CLI, /sites/export + /sites/map API
 

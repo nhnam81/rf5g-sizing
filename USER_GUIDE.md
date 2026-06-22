@@ -1,6 +1,8 @@
 # 📡 5G NR RF Coverage Sizing Tool — Hướng dẫn sử dụng
 
-> Phiên bản 1.0 | 3GPP TR 38.901 V16.1.0 | TS 38.104, 38.214, 38.306
+> Phiên bản 1.2 | 3GPP TR 38.901 V16.1.0 | TS 38.104, 38.214, 38.306
+>
+> **v1.2 cập nhật:** streamlit-folium rendering, Manual sector input (lat,lon,azimuth,beamwidth), Radio/Antenna catalog dropdown, Capacity sites map, Area verification, Sector directionality warning
 
 ---
 
@@ -692,6 +694,57 @@ streamlit run rf5g/web/guided.py
 | 🏢 Indoor InH n78 | Tòa nhà/trung tâm thương mại |
 | 📶 Urban n41 | TDD mid-band (Mỹ), 80 MHz, 64T64R |
 
+### 5.3 Tính năng nâng cao (v1.2)
+
+#### Radio/Antenna Catalog Dropdown
+
+Sidebar có dropdown chọn Radio và Antenna từ catalog (5 radios, 9 antennas):
+- **Radio**: Ericsson Radio 4415/8883, Prose 2TR, 2W2TC, SWave 0640
+- **Antenna**: Ericsson KRE 2405/9011, Prose SWave 40D/0640, v.v.
+- Khi chọn catalog → tự động override TX power, antenna gain, beamwidth, MIMO config
+
+#### Nhập site thủ công (Manual Site Input)
+
+Trong tab Map, ô text cho phép nhập site thủ công:
+
+```
+# Chỉ lat, lon (dùng config chung cho sector)
+10.782000, 106.700000
+
+# Đầy đủ: lat, lon, azimuth, beamwidth
+10.782000, 106.700000, 0, 65
+10.785000, 106.705000, 120, 65
+10.780000, 106.695000, 240, 65
+```
+
+- **Azimuth**: hướng góc phủ (0°=Bắc, 90°=Đông, 180°=Nam)
+- **Beamwidth**: độ rộng tia (65° cho antenna 65°, 90° cho antenna 90°)
+- Site có azimuth+beamwidth → vẽ sector wedge (tím)
+- Site không có azimuth → dùng config chung (omni/3-sector)
+- Độ chính xác: 6 chữ số thập phân (~0.1m)
+
+#### Map views
+
+3 chế độ xem bản đồ:
+1. **Coverage Sites** — sites phủ sóng (hex grid hoặc thủ công)
+2. **Capacity Sites** — sites theo dung lượng
+3. **Comparison** — so sánh coverage vs capacity overlay
+
+#### Sector directionality warning
+
+Khi chọn antenna sector (beamwidth < 360°) và sectors=1:
+- Tool cảnh báo: "Mỗi site chỉ phủ {beamwidth}° — KHÔNG phải 360°"
+- Vẽ sector wedge màu tím cho directional coverage
+
+### 5.4 Khắc phục sự cố
+
+| Lỗi | Nguyên nhân | Khắc phục |
+|---|---|---|
+| Bản đồ trắng/blank | streamlit-folium chưa cài | `pip install streamlit-folium` |
+| Map không full-width | width parameter | Dùng `st_folium(fmap, width=None, height=600)` |
+| Sector vẽ thành hình tròn | horizontal_pattern rỗng | Dùng `_cosine_pattern(beamwidth, gain)` |
+| AntennaPattern error | thiếu `name` argument | Truyền `name="manual"` vào constructor |
+
 ---
 
-*Hướng dẫn này dành cho rf5g v1.0.0 — 5G NR RF Coverage Sizing Tool (3GPP TR 38.901 V16.1.0)*
+*Hướng dẫn này dành cho rf5g v1.2.0 — 5G NR RF Coverage Sizing Tool (3GPP TR 38.901 V16.1.0)*

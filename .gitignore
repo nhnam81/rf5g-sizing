@@ -31,6 +31,13 @@ Radio and Anten Product/**/*_MSI*/
 # Keep catalog JSON
 !radio_antenna_catalog.json
 
+# Generated reports/outputs
+rf5g_coverage_*.html
+rf5g_report_*.html
+rf5g_report_*.md
+rf5g_verification_report.html
+test_map.html
+
 # IDE
 .vscode/
 .idea/
