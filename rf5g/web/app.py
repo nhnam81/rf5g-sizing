@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 from rf5g.models.input_schema import RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig, FrequencyConfig, UEConfig, MarginsConfig, QoSConfig
+from rf5g.models.lookup_tables import BandLookup
 from rf5g.models.output_schema import SizingOutput
 from rf5g.cli import _run_sizing
 from rf5g.viz.coverage_map import generate_coverage_map
@@ -47,10 +48,14 @@ with st.sidebar:
     sectors = st.selectbox("Sectors", [1, 3, 6], index=1)
 
     st.subheader("📻 Frequency")
-    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71"], index=0)
+    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n40", "n1", "n3", "n8", "n28", "n101", "n257", "n258", "n261"], index=0)
     bandwidth_mhz = st.number_input("Bandwidth (MHz)", min_value=5.0, value=100.0, step=5.0)
     scs_khz = st.selectbox("SCS (kHz)", [15, 30, 60, 120], index=1)
-    tdd_dl_ratio = st.slider("TDD DL Ratio", min_value=0.5, max_value=0.9, value=0.70, step=0.05)
+    # Show duplex mode info
+    _bl_info = BandLookup()
+    _band_duplex = _bl_info.get_band(band).get("duplex", "TDD")
+    st.info(f"{_band_duplex} mode" + (" — TDD DL Ratio applies" if _band_duplex == "TDD" else " — Full duplex, no TDD ratio needed"))
+    tdd_dl_ratio = st.slider("TDD DL Ratio", min_value=0.5, max_value=0.9, value=0.70, step=0.05, disabled=(_band_duplex == "FDD"))
 
     st.subheader("📱 UE")
     power_class = st.selectbox("Power Class", ["PC1", "PC2", "PC3", "PC4"], index=2)
@@ -89,6 +94,15 @@ with st.sidebar:
 def build_input() -> RFSizingInput:
     if "loaded_config" in st.session_state:
         return RFSizingInput(**st.session_state["loaded_config"])
+    # Auto-detect duplex from band data
+    _bl = BandLookup()
+    _band_info = _bl.get_band(band)
+    _duplex = _band_info.get("duplex", "TDD")
+    # For FDD bands, hide TDD DL ratio and set to 1.0 (full duplex)
+    if _duplex == "FDD":
+        tdd_dl_ratio_final = 1.0
+    else:
+        tdd_dl_ratio_final = tdd_dl_ratio
     return RFSizingInput(
         project=ProjectConfig(
             name=project_name,
@@ -113,7 +127,8 @@ def build_input() -> RFSizingInput:
             band=band,
             bandwidth_mhz=bandwidth_mhz,
             scs_khz=scs_khz,
-            tdd_dl_ratio=tdd_dl_ratio,
+            duplex=_duplex,
+            tdd_dl_ratio=tdd_dl_ratio_final,
         ),
         user_equipment=UEConfig(
             power_class=power_class,
