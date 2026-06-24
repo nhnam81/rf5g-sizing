@@ -1,7 +1,7 @@
 ; ── rf5g-sizing Inno Setup Installer ──
 ; 5G NR RF Coverage Sizing Tool — Windows Installer
 #define AppName "rf5g-sizing"
-#define AppVersion "1.2.0"
+#define AppVersion "1.3.0"
 #define AppPublisher "nhnam"
 #define AppURL "https://github.com/nhnam/rf5g-sizing"
 
