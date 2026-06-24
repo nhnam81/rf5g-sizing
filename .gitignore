@@ -1,4 +1,4 @@
-# Data files
+﻿# Data files
 __pycache__/
 *.pyc
 *.pyo
@@ -45,3 +45,13 @@ test_map.html
 # OS
 Thumbs.db
 .DS_Store
+# Build artifacts
+build_installer/python-embed/
+dist/
+*.exe
+*.rar
+
+# Temp/backup files
+tmp_original_app.py
+rf5g/web/app_original.py
+rf5g/web/app_original_full.py
