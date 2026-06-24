@@ -17,6 +17,16 @@ from rf5g.viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zo
 from rf5g.viz.report import generate_html_report, generate_markdown_report
 from streamlit_folium import st_folium
 
+
+@st.cache_data
+def _load_catalog() -> dict:
+    """Load radio/antenna product catalog."""
+    from rf5g.models.lookup_tables import BandLookup
+    import json
+    catalog_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "radio_antenna_catalog.json")
+    with open(catalog_path, encoding="utf-8") as f:
+        return json.load(f)
+
 st.set_page_config(
     page_title="5G NR RF Sizing",
     page_icon="📡",
@@ -44,7 +54,32 @@ with st.sidebar:
 
     st.subheader("📡 Base Station")
     antenna_config = st.selectbox("Antenna Config", ["32T32R", "64T64R", "8T8R", "4T4R", "2T2R"], index=0)
-    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=200.0, step=10.0)
+
+    # --- Radio catalog selection ---
+    _catalog = _load_catalog()
+    _radio_options = [""] + [f"{r['vendor']} {r['model']}" for r in _catalog["radios"]]
+    _radio_sel = st.selectbox("📻 Radio", _radio_options, index=0,
+        help="Select a radio from the product catalog, or leave blank for manual config")
+    _radio_match = None
+    if _radio_sel:
+        _radio_match = next(r for r in _catalog["radios"] if f"{r['vendor']} {r['model']}" == _radio_sel)
+        st.caption(f"{_radio_match['description']} — {_radio_match.get('max_tx_power_w', '?')}W, {_radio_match.get('mimo_config', '?')}")
+        # Auto-fill antenna_config from MIMO config
+        _mimo_map = {"2T2R": "2T2R", "4T4R": "4T4R", "8T8R": "8T8R", "32T32R": "32T32R", "64T64R": "64T64R"}
+        _radio_mimo = _radio_match.get("mimo_config", "")
+        if _radio_mimo in _mimo_map:
+            st.info(f"Auto-detected MIMO config: {_radio_mimo}")
+
+    # --- Antenna catalog selection ---
+    _ant_options = [""] + [f"{a['vendor']} {a['model']}" for a in _catalog["antennas"]]
+    _ant_sel = st.selectbox("📡 Antenna", _ant_options, index=0,
+        help="Select an antenna from the product catalog, or leave blank for manual config")
+    _ant_match = None
+    if _ant_sel:
+        _ant_match = next(a for a in _catalog["antennas"] if f"{a['vendor']} {a['model']}" == _ant_sel)
+        st.caption(f"{_ant_match['description']} — {_ant_match.get('gain_dbi', '?')} dBi, {_ant_match.get('h_beamwidth_deg', '?')}° azimuth")
+
+    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_match["max_tx_power_w"]) if _radio_sel and _radio_match.get("max_tx_power_w") else 200.0, step=10.0)
     bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0)
     sectors = st.selectbox("Sectors", [1, 3, 6], index=1)
 
@@ -104,6 +139,20 @@ def build_input() -> RFSizingInput:
         tdd_dl_ratio_final = 1.0
     else:
         tdd_dl_ratio_final = tdd_dl_ratio
+    # Resolve radio/antenna catalog selections
+    _radio_vendor = None
+    _radio_model = None
+    _antenna_vendor = None
+    _antenna_model = None
+    if _radio_sel:
+        _rm = next(r for r in _load_catalog()["radios"] if f"{r['vendor']} {r['model']}" == _radio_sel)
+        _radio_vendor = _rm["vendor"]
+        _radio_model = _rm["model"]
+    if _ant_sel:
+        _am = next(a for a in _load_catalog()["antennas"] if f"{a['vendor']} {a['model']}" == _ant_sel)
+        _antenna_vendor = _am["vendor"]
+        _antenna_model = _am["model"]
+
     return RFSizingInput(
         project=ProjectConfig(
             name=project_name,
@@ -118,6 +167,10 @@ def build_input() -> RFSizingInput:
         ),
         base_station=BaseStationConfig(
             antenna_config=antenna_config,
+            radio_vendor=_radio_vendor,
+            radio_model=_radio_model,
+            antenna_vendor=_antenna_vendor,
+            antenna_model=_antenna_model,
             tx_power_w=tx_power_w,
             height_m=bs_height_m,
             sectors=sectors,
