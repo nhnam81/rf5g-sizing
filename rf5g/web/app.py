@@ -312,16 +312,63 @@ with tab_recs:
 
 # --- Map ---
 with tab_map:
-    st.subheader("Coverage Map")
+    st.subheader("📡 Coverage Map")
+
+    # Map mode selector
+    map_mode = st.radio(
+        "Map overlay",
+        ["Coverage", "Capacity"],
+        horizontal=True,
+        key="map_mode",
+    )
+
+    # Manual station editor
+    st.markdown("**Add manual sites** (optional): comma-separated `lat, lon, azimuth°, beamwidth°`")
+    manual_input = st.text_area(
+        "Manual sites",
+        placeholder="10.782, 106.695, 0, 65\n10.785, 106.700, 120, 65",
+        key="manual_sites",
+    )
+
+    site_meta = None
+    custom_sites = None
+    if manual_input.strip():
+        try:
+            parsed = []
+            meta = []
+            for line in manual_input.strip().splitlines():
+                parts = [p.strip() for p in line.split(",")]
+                lat = float(parts[0])
+                lon = float(parts[1])
+                azimuth = float(parts[2]) if len(parts) > 2 else 0
+                beamwidth = float(parts[3]) if len(parts) > 3 else 65
+                parsed.append((lat, lon))
+                meta.append({"azimuth": azimuth, "beamwidth": beamwidth})
+            custom_sites = parsed
+            site_meta = meta
+            st.success(f"Parsed {len(parsed)} manual site(s)")
+        except Exception as e:
+            st.warning(f"Could not parse manual sites: {e}")
+
+    # Coverage vs Capacity color
+    n_cov = result.site_estimate.coverage_sites
+    n_cap = getattr(result.site_estimate, "capacity_sites", None) or n_cov
+    is_capacity = map_mode == "Capacity"
+    n_sites = max(n_cov, n_cap) if is_capacity else n_cov
+    center_lat_map = result.project_name and center_lat or 10.8231
+    center_lon_map = result.project_name and center_lon or 106.6297
+
     with st.spinner("Generating map..."):
         try:
             folium_map = generate_interactive_map(
                 result,
-                center_lat=result.project_name and center_lat or 10.8231,
-                center_lon=result.project_name and center_lon or 106.6297,
+                center_lat=center_lat_map,
+                center_lon=center_lon_map,
+                custom_sites=custom_sites,
+                site_meta=site_meta,
                 return_map=True,
             )
-            st_folium(folium_map, width=1000, height=600)
+            st_folium(folium_map, width="stretch", height=600)
         except Exception as e:
             st.error(f"Map generation error: {e}")
 
