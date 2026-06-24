@@ -1,4 +1,4 @@
-﻿"""Streamlit frontend for rf5g â€” 5G NR RF Coverage Sizing Tool."""
+"""Streamlit frontend for rf5g — 5G NR RF Coverage Sizing Tool."""
 from __future__ import annotations
 import json
 import sys
@@ -9,78 +9,79 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 import streamlit as st
 from rf5g.models.input_schema import RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig, FrequencyConfig, UEConfig, MarginsConfig, QoSConfig
-from rf5g.models.lookup_tables import BandLookup
 from rf5g.models.output_schema import SizingOutput
+from rf5g.models.lookup_tables import BandLookup
 from rf5g.cli import _run_sizing
 from rf5g.viz.coverage_map import generate_coverage_map, generate_interactive_map
-from streamlit_folium import st_folium
 from rf5g.viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zones, plot_capacity_comparison
 from rf5g.viz.report import generate_html_report, generate_markdown_report
+from streamlit_folium import st_folium
 
 st.set_page_config(
     page_title="5G NR RF Sizing",
-    page_icon="ðŸ“¡",
+    page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-st.title("ðŸ“¡ 5G NR RF Coverage Sizing Tool")
+st.title("📡 5G NR RF Coverage Sizing Tool")
 st.caption("3GPP TR 38.901 | TS 38.104, 38.214, 38.306 | Open-source RF planning")
 
 # --- Sidebar: Input Parameters ---
 with st.sidebar:
-    st.header("âš™ï¸ Input Parameters")
+    st.header("⚙️ Input Parameters")
 
-    st.subheader("ðŸ“ Project")
+    st.subheader("📋 Project")
     project_name = st.text_input("Project Name", value="Dense Urban n78")
-    area_km2 = st.number_input("Coverage Area (kmÂ²)", min_value=0.1, value=50.0, step=1.0)
+    area_km2 = st.number_input("Coverage Area (km²)", min_value=0.1, value=50.0, step=1.0)
     center_lat = st.number_input("Center Latitude", value=10.78, step=0.01)
     center_lon = st.number_input("Center Longitude", value=106.70, step=0.01)
 
-    st.subheader("ðŸ™ï¸ Environment")
+    st.subheader("🏙️ Environment")
     scenario = st.selectbox("Scenario", ["UMa", "UMi", "RMa", "InH"], index=0)
     obstacle_density = st.selectbox("Obstacle Density", ["heavy", "medium", "light"], index=0)
     coverage_prob = st.slider("Coverage Probability", min_value=0.80, max_value=0.99, value=0.95, step=0.01)
 
-    st.subheader("ðŸ“¡ Base Station")
+    st.subheader("📡 Base Station")
     antenna_config = st.selectbox("Antenna Config", ["32T32R", "64T64R", "8T8R", "4T4R", "2T2R"], index=0)
     tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=200.0, step=10.0)
     bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0)
     sectors = st.selectbox("Sectors", [1, 3, 6], index=1)
 
-    st.subheader("ðŸ“» Frequency")
-    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n40", "n1", "n3", "n8", "n28", "n101", "n257", "n258", "n261"], index=0)
+    st.subheader("📶 Frequency")
+    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71"], index=0)
     bandwidth_mhz = st.number_input("Bandwidth (MHz)", min_value=5.0, value=100.0, step=5.0)
     scs_khz = st.selectbox("SCS (kHz)", [15, 30, 60, 120], index=1)
-    # Show duplex mode info
+
+    # Auto-detect duplex from band data
     _bl_info = BandLookup()
     _band_duplex = _bl_info.get_band(band).get("duplex", "TDD")
-    st.info(f"{_band_duplex} mode" + (" â€” TDD DL Ratio applies" if _band_duplex == "TDD" else " â€” Full duplex, no TDD ratio needed"))
+    st.info(f"{_band_duplex} mode" + (" — TDD DL Ratio applies" if _band_duplex == "TDD" else " — Full duplex, DL ratio = 1.0"))
     tdd_dl_ratio = st.slider("TDD DL Ratio", min_value=0.5, max_value=0.9, value=0.70, step=0.05, disabled=(_band_duplex == "FDD"))
 
-    st.subheader("ðŸ“± UE")
+    st.subheader("📱 UE")
     power_class = st.selectbox("Power Class", ["PC1", "PC2", "PC3", "PC4"], index=2)
     ue_height_m = st.number_input("UE Height (m)", min_value=1.0, value=1.5, step=0.1)
     ue_noise_figure = st.number_input("UE Noise Figure (dB)", min_value=0.0, value=7.0, step=0.5)
 
-    st.subheader("ðŸ“Š Margins")
+    st.subheader("📊 Margins")
     interference_db = st.number_input("Interference Margin (dB)", min_value=0.0, value=3.0, step=0.5)
     penetration_db = st.number_input("Penetration Loss (dB)", min_value=0.0, value=10.0, step=1.0)
     rain_db = st.number_input("Rain Attenuation (dB)", min_value=0.0, value=1.0, step=0.5)
     overlap_factor = st.number_input("Overlap Factor", min_value=0.0, max_value=0.5, value=0.25, step=0.05)
 
-    st.subheader("ðŸŽ¯ QoS")
+    st.subheader("🎯 QoS")
     primary_service = st.selectbox("Primary Service", ["mixed", "vonr", "video_hd", "video_4k", "data", "gaming", "iot"], index=0)
-    users_per_km2 = st.number_input("Users per kmÂ²", min_value=1.0, value=300.0, step=10.0)
+    users_per_km2 = st.number_input("Users per km²", min_value=1.0, value=300.0, step=10.0)
     dl_per_user_mbps = st.number_input("DL per User (Mbps)", min_value=0.5, value=20.0, step=1.0)
     ul_per_user_mbps = st.number_input("UL per User (Mbps)", min_value=0.1, value=5.0, step=0.5)
     concurrent_ratio = st.number_input("Concurrent Ratio", min_value=0.01, max_value=0.99, value=0.10, step=0.01)
 
     st.divider()
-    run_button = st.button("ðŸš€ Calculate", width="stretch", type="primary")
+    run_button = st.button("🚀 Calculate", width="stretch", type="primary")
 
     # Load config file
-    st.subheader("ðŸ“ Load Config")
+    st.subheader("📁 Load Config")
     uploaded = st.file_uploader("Upload JSON config", type=["json"])
     if uploaded:
         try:
@@ -89,7 +90,6 @@ with st.sidebar:
             st.success(f"Loaded: {config_data.get('project', {}).get('name', 'unnamed')}")
         except Exception as e:
             st.error(f"Invalid JSON: {e}")
-
 
 # --- Build input ---
 def build_input() -> RFSizingInput:
@@ -128,13 +128,13 @@ def build_input() -> RFSizingInput:
             band=band,
             bandwidth_mhz=bandwidth_mhz,
             scs_khz=scs_khz,
-            duplex=_duplex,
             tdd_dl_ratio=tdd_dl_ratio_final,
+            duplex=_duplex,
         ),
         user_equipment=UEConfig(
             power_class=power_class,
             height_m=ue_height_m,
-            noise_figure_db=ue_noise_figure,
+            noise_figure=ue_noise_figure,
         ),
         margins=MarginsConfig(
             interference_db=interference_db,
@@ -150,7 +150,6 @@ def build_input() -> RFSizingInput:
             concurrent_ratio=concurrent_ratio,
         ),
     )
-
 
 # --- Run calculation ---
 if run_button or "result" in st.session_state:
@@ -172,7 +171,7 @@ result: SizingOutput = st.session_state["result"]
 
 # --- Results Display ---
 tab_overview, tab_link_budget, tab_coverage, tab_sinr, tab_capacity, tab_qos, tab_recs, tab_map, tab_charts = st.tabs([
-    "ðŸ“Š Overview", "ðŸ“¡ Link Budget", "ðŸ—ºï¸ Coverage", "ðŸ“¶ SINR", "ðŸ“¦ Capacity", "âœ… QoS", "ðŸ’¡ Recommendations", "ðŸ—ºï¸ Map", "ðŸ“ˆ Charts"
+    "📊 Overview", "📡 Link Budget", "🗺️ Coverage", "📶 SINR", "📦 Capacity", "✅ QoS", "💡 Recommendations", "🗺️ Map", "📈 Charts"
 ])
 
 # --- Overview ---
@@ -187,12 +186,12 @@ with tab_overview:
     col5.metric("DL MAPL", f"{result.link_budget_dl.mapl_db:.1f} dB")
     col6.metric("UL MAPL", f"{result.link_budget_ul.mapl_db:.1f} dB")
     if result.capacity:
-        cap_color = "ðŸŸ¢" if result.capacity.capacity_sufficient else "ðŸ”´"
+        cap_color = "🟢" if result.capacity.capacity_sufficient else "🔴"
         col7.metric("Capacity", f"{cap_color} {'Sufficient' if result.capacity.capacity_sufficient else 'Insufficient'}")
         col8.metric("Total Sites", f"{result.capacity.total_sites}")
 
     st.divider()
-    st.subheader("ðŸ“‹ Summary")
+    st.subheader("📋 Summary")
     st.write(f"**Project:** {result.project_name} | **Scenario:** {result.environment} | **Band:** {result.band} {result.bandwidth_mhz:.0f}MHz")
     st.write(f"**TX Power:** {result.tx_power_w}W | **Antenna:** {result.antenna_config} | **Propagation:** {result.propagation.model}")
 
@@ -200,11 +199,11 @@ with tab_overview:
     col_dl, col_rpt = st.columns(2)
     with col_dl:
         json_str = result.model_dump_json(indent=2)
-        st.download_button("ðŸ“¥ Download JSON", data=json_str, file_name=f"rf5g_{result.project_name.replace(' ', '_')}.json", mime="application/json")
+        st.download_button("📥 Download JSON", data=json_str, file_name=f"rf5g_{result.project_name.replace(' ', '_')}.json", mime="application/json")
     with col_rpt:
         html_path = generate_html_report(result)
         html_content = open(html_path, encoding="utf-8").read()
-        st.download_button("ðŸ“„ Download HTML Report", data=html_content, file_name=f"rf5g_{result.project_name.replace(' ', '_')}.html", mime="text/html")
+        st.download_button("📄 Download HTML Report", data=html_content, file_name=f"rf5g_{result.project_name.replace(' ', '_')}.html", mime="text/html")
 
 # --- Link Budget ---
 with tab_link_budget:
@@ -275,13 +274,13 @@ with tab_capacity:
                 f"{result.capacity.cell_throughput_ul_mbps:.1f} Mbps",
                 f"{result.capacity.total_capacity_dl_gbps:.2f} Gbps",
                 f"{result.capacity.total_demand_dl_gbps:.2f} Gbps",
-                "âœ… YES" if result.capacity.capacity_sufficient else "âŒ NO",
+                "✅ YES" if result.capacity.capacity_sufficient else "❌ NO",
                 str(result.capacity.total_sites),
             ],
         }
         st.dataframe(cap_data, width="stretch")
         if result.capacity.additional_sites_needed > 0:
-            st.warning(f"âš ï¸ Additional {result.capacity.additional_sites_needed} sites needed for capacity.")
+            st.warning(f"⚠️ Additional {result.capacity.additional_sites_needed} sites needed for capacity.")
     else:
         st.info("Capacity calculation not available.")
 
@@ -296,7 +295,7 @@ with tab_qos:
                 "SINR Required": f"{q.sinr_required_db:.0f} dB",
                 "SINR Available": f"{q.sinr_available_db:.1f} dB",
                 "Area %": f"{q.area_percentage:.0f}%",
-                "Status": "âœ… PASS" if q.passed else "âŒ FAIL",
+                "Status": "✅ PASS" if q.passed else "❌ FAIL",
             })
         st.dataframe(qos_rows, width="stretch")
     else:
@@ -322,7 +321,7 @@ with tab_map:
                 center_lon=result.project_name and center_lon or 106.6297,
                 return_map=True,
             )
-            st_folium(folium_map, width=1000, height=600, returned_items=[])
+            st_folium(folium_map, width=1000, height=600)
         except Exception as e:
             st.error(f"Map generation error: {e}")
 
