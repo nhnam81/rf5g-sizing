@@ -123,9 +123,9 @@ def calculate_link_budget(
     dl_sensitivity_dbm = dl_noise_floor_dbm + dl_snr_required_db
 
     # DL MAPL
+    # Note: dl_cable_loss_db is already included in dl_eirp, do NOT subtract again
     dl_mapl = (dl_eirp + dl_rx_gain_db
                - dl_sensitivity_dbm
-               - dl_cable_loss_db
                - dl_body_loss_db
                - inp.margins.interference_db
                - sf_margin
@@ -140,7 +140,7 @@ def calculate_link_budget(
         tx_power_dbm=round(dl_tx_power_dbm, 2),
         tx_gain_db=round(dl_tx_gain_db, 2),
         rx_gain_db=round(dl_rx_gain_db, 2),
-        cable_loss_db=round(dl_cable_loss_db, 2),
+        cable_loss_db=round(dl_cable_loss_db, 2),  # included in EIRP, shown for reference
         body_loss_db=round(dl_body_loss_db, 2),
         interference_margin_db=round(inp.margins.interference_db, 2),
         shadow_fading_margin_db=round(sf_margin, 2),

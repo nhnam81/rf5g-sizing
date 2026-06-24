@@ -83,7 +83,7 @@ EXAMPLES = {
             "project": {"name": "Rural n8", "area_km2": 500.0, "center_lat": 10.03, "center_lon": 105.77},
             "environment": {"scenario": "RMa", "obstacle_density": "light", "coverage_probability": 0.90},
             "base_station": {"tx_power_w": 40.0, "antenna_config": "4T4R", "height_m": 35.0, "sectors": 3, "cable_loss_db": 2.0, "noise_figure_db": 3.0},
-            "frequency": {"band": "n8", "bandwidth_mhz": 10.0, "scs_khz": 15, "tdd_dl_ratio": 0.60},
+            "frequency": {"band": "n8", "bandwidth_mhz": 10.0, "scs_khz": 15, "duplex": "FDD", "tdd_dl_ratio": 1.0},
             "user_equipment": {"power_class": "PC3", "height_m": 1.5, "noise_figure_db": 9.0},
             "margins": {"interference_db": 1.0, "penetration_db": 5.0, "rain_attenuation_db": 0.3, "overlap_factor": 0.15},
             "qos": {"primary_service": "data", "users_per_km2": 20.0, "dl_per_user_mbps": 5.0, "ul_per_user_mbps": 1.0, "concurrent_ratio": 0.10},
@@ -101,6 +101,56 @@ EXAMPLES = {
             "user_equipment": {"power_class": "PC3", "height_m": 1.5, "noise_figure_db": 9.0},
             "margins": {"interference_db": 5.0, "penetration_db": 0.0, "rain_attenuation_db": 0.0, "overlap_factor": 0.30},
             "qos": {"primary_service": "video_4k", "users_per_km2": 5000.0, "dl_per_user_mbps": 50.0, "ul_per_user_mbps": 10.0, "concurrent_ratio": 0.20},
+        },
+    },
+    "\U0001f3e0 Rural n28 (700MHz FDD)": {
+        "desc": "Kịch bản phủ sóng rộng nông thôn, băng tần n28 (700 MHz), FDD 10 MHz bandwidth. Phù hợp phủ sóng 5G vùng sâu vùng xa (ĐBSCL, Tây Nguyên). FDD mode — full duplex, UL throughput bằng DL.",
+        "config": {
+            "project": {"name": "Rural n28", "area_km2": 500.0, "center_lat": 10.03, "center_lon": 105.77},
+            "environment": {"scenario": "RMa", "obstacle_density": "light", "coverage_probability": 0.90},
+            "base_station": {"tx_power_w": 40.0, "antenna_config": "4T4R", "height_m": 35.0, "sectors": 3, "cable_loss_db": 2.0, "noise_figure_db": 3.0},
+            "frequency": {"band": "n28", "bandwidth_mhz": 10.0, "scs_khz": 15, "duplex": "FDD", "tdd_dl_ratio": 1.0},
+            "user_equipment": {"power_class": "PC3", "height_m": 1.5, "noise_figure_db": 9.0},
+            "margins": {"interference_db": 1.0, "penetration_db": 5.0, "rain_attenuation_db": 0.3, "overlap_factor": 0.15},
+            "qos": {"primary_service": "data", "users_per_km2": 20.0, "dl_per_user_mbps": 5.0, "ul_per_user_mbps": 1.0, "concurrent_ratio": 0.10},
+        },
+    },
+    "\U0001f310 Urban n40 (2.3GHz TDD)": {
+        "desc": "Kịch bản đô thị băng tần n40 (2.3 GHz), TDD 20 MHz bandwidth. Phù hợp quy hoạch 5G tại khu đô thị Việt Nam (Viettel n40 2300-2310 MHz). TDD mid-band, cân bằng coverage và capacity.",
+        "config": {
+            "project": {"name": "Urban n40", "area_km2": 50.0, "center_lat": 10.78, "center_lon": 106.70},
+            "environment": {"scenario": "UMa", "obstacle_density": "heavy", "coverage_probability": 0.95},
+            "base_station": {"tx_power_w": 100.0, "antenna_config": "32T32R", "height_m": 25.0, "sectors": 3, "cable_loss_db": 1.0, "noise_figure_db": 3.5},
+            "frequency": {"band": "n40", "bandwidth_mhz": 20.0, "scs_khz": 30, "duplex": "TDD", "tdd_dl_ratio": 0.70},
+            "user_equipment": {"power_class": "PC3", "height_m": 1.5, "noise_figure_db": 7.0},
+            "margins": {"interference_db": 3.0, "penetration_db": 10.0, "rain_attenuation_db": 1.0, "overlap_factor": 0.25},
+            "qos": {"primary_service": "data", "users_per_km2": 300.0, "dl_per_user_mbps": 20.0, "ul_per_user_mbps": 5.0, "concurrent_ratio": 0.10},
+        },
+    },
+    "\U0001f4e1 mmWave n258 (26GHz)": {
+        "desc": "Kịch bản mmWave băng tần n258 (24.25-27.5 GHz), 100 MHz bandwidth. Phù hợp hotspot density cao (quận 1, khu thương mại). Coverage rất ngắn nhưng throughput rất cao (Gbps). Viettel n258 24250-26500 MHz, VNPT n258 26500-27500 MHz.",
+        "config": {
+            "project": {"name": "Hotspot n258 mmWave", "area_km2": 5.0, "center_lat": 10.78, "center_lon": 106.70},
+            "environment": {"scenario": "UMi", "obstacle_density": "heavy", "coverage_probability": 0.90},
+            "base_station": {"tx_power_w": 10.0, "antenna_config": "4T4R", "height_m": 6.0, "sectors": 1, "cable_loss_db": 0.5, "noise_figure_db": 5.0},
+            "frequency": {"band": "n258", "bandwidth_mhz": 100.0, "scs_khz": 120, "duplex": "TDD", "tdd_dl_ratio": 0.70},
+            "user_equipment": {"power_class": "PC3", "height_m": 1.5, "noise_figure_db": 10.0},
+            "margins": {"interference_db": 5.0, "penetration_db": 20.0, "rain_attenuation_db": 5.0, "overlap_factor": 0.30},
+            "qos": {"primary_service": "video_4k", "users_per_km2": 1000.0, "dl_per_user_mbps": 100.0, "ul_per_user_mbps": 20.0, "concurrent_ratio": 0.15},
+        },
+    },
+    "\U0001f682 FRMCS n101 (1.9GHz Railway)": {
+        "desc": "Kịch bản FRMCS (Future Railway Mobile Communication System) băng tần n101 (1900-1910 MHz TDD). "
+                "Dành riêng cho thông tin liên lạc đường sắt (ETCS/TCMS voice & data). "
+                "BW tối đa 10 MHz, SCS 15/30 kHz. Phù hợp phủ sóng dọc tuyến đường sắt.",
+        "config": {
+            "project": {"name": "FRMCS n101 Railway", "area_km2": 200.0, "center_lat": 10.78, "center_lon": 106.70},
+            "environment": {"scenario": "RMa", "obstacle_density": "light", "coverage_probability": 0.99},
+            "base_station": {"tx_power_w": 40.0, "antenna_config": "4T4R", "height_m": 25.0, "sectors": 3, "cable_loss_db": 1.0, "noise_figure_db": 3.5},
+            "frequency": {"band": "n101", "bandwidth_mhz": 10.0, "scs_khz": 30, "duplex": "TDD", "tdd_dl_ratio": 0.70},
+            "user_equipment": {"power_class": "PC3", "height_m": 3.0, "noise_figure_db": 7.0},
+            "margins": {"interference_db": 3.0, "penetration_db": 5.0, "rain_attenuation_db": 0.5, "overlap_factor": 0.20},
+            "qos": {"primary_service": "vonr", "users_per_km2": 20.0, "dl_per_user_mbps": 10.0, "ul_per_user_mbps": 5.0, "concurrent_ratio": 0.30},
         },
     },
     "📶 Sub6 GHz n41 (TDD Mid-band)": {
@@ -409,7 +459,7 @@ with st.expander("📡 Base Station — Trạm phát", expanded=True):
 # ── Frequency ──
 with st.expander("📻 Frequency — Băng tần & Cấu hình", expanded=True):
     c1, c2, c3 = st.columns(3)
-    band = c1.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71"], index=["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71"].index(defaults["band"]), help=get_help("frequency.band"))
+    band = c1.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n40", "n101", "n257", "n258", "n261"], index=["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n40", "n101", "n257", "n258", "n261"].index(defaults["band"]), help=get_help("frequency.band"))
     bandwidth_mhz = c2.number_input("Bandwidth (MHz)", min_value=5.0, value=defaults["bandwidth_mhz"], step=5.0, help=get_help("frequency.bandwidth_mhz"))
     scs_khz = c3.selectbox("SCS (kHz)", [15, 30, 60, 120], index=[15, 30, 60, 120].index(defaults["scs_khz"]), help=get_help("frequency.scs_khz"))
     tdd_dl_ratio = st.slider("TDD DL Ratio", min_value=0.50, max_value=0.90, value=defaults["tdd_dl_ratio"], step=0.05, help=get_help("frequency.tdd_dl_ratio"))

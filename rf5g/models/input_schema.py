@@ -35,7 +35,7 @@ class FrequencyConfig(BaseModel):
     bandwidth_mhz: float = Field(100.0, gt=0, description="Channel bandwidth in MHz")
     scs_khz: Literal[15, 30, 60, 120] = 30
     duplex: Literal["TDD", "FDD"] = "TDD"
-    tdd_dl_ratio: float = Field(0.70, gt=0, lt=1, description="TDD DL ratio (e.g. 0.70 for DDDSU)")
+    tdd_dl_ratio: float = Field(0.70, gt=0, le=1, description="TDD DL ratio (0.70 for DDDSU, 1.0 for FDD)")
 
 
 class UEConfig(BaseModel):

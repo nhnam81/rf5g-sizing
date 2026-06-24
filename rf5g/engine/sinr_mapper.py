@@ -82,9 +82,17 @@ def calculate_cell_throughput(
     # Per second: × 1000 ms/s × slots_per_ms
     raw_bits_per_second = nrb * 12 * 14 * spectral_efficiency_bps_hz * slots_per_ms * 1000 * layers
 
-    # Apply overhead and TDD ratio
-    dl_mbps = raw_bits_per_second * (1 - overhead) * tdd_dl_ratio / 1e6
-    ul_mbps = raw_bits_per_second * (1 - overhead) * (1 - tdd_dl_ratio) / 1e6
+    # Apply overhead and duplex ratio
+    # For FDD: DL and UL each get full bandwidth (separate carriers)
+    # For TDD: DL gets tdd_dl_ratio share, UL gets (1 - tdd_dl_ratio) share
+    if tdd_dl_ratio >= 1.0:
+        # FDD: full bandwidth for both DL and UL
+        dl_mbps = raw_bits_per_second * (1 - overhead) / 1e6
+        ul_mbps = raw_bits_per_second * (1 - overhead) / 1e6  # Separate carrier
+    else:
+        # TDD: share bandwidth between DL and UL
+        dl_mbps = raw_bits_per_second * (1 - overhead) * tdd_dl_ratio / 1e6
+        ul_mbps = raw_bits_per_second * (1 - overhead) * (1 - tdd_dl_ratio) / 1e6
 
     return {
         "dl_mbps": round(dl_mbps, 1),
