@@ -44,8 +44,8 @@ with st.sidebar:
     st.subheader("📋 Project")
     project_name = st.text_input("Project Name", value="Dense Urban n78")
     area_km2 = st.number_input("Coverage Area (km²)", min_value=0.1, value=50.0, step=1.0)
-    center_lat = st.number_input("Center Latitude", value=10.78, step=0.01)
-    center_lon = st.number_input("Center Longitude", value=106.70, step=0.01)
+    center_lat = st.number_input("Center Latitude", value=10.780000, step=0.000001, format="%.6f")
+    center_lon = st.number_input("Center Longitude", value=106.700000, step=0.000001, format="%.6f")
 
     st.subheader("🏙️ Environment")
     scenario = st.selectbox("Scenario", ["UMa", "UMi", "RMa", "InH"], index=0)
