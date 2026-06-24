@@ -42,18 +42,26 @@ with st.sidebar:
     st.header("⚙️ Input Parameters")
 
     st.subheader("📋 Project")
-    project_name = st.text_input("Project Name", value="Dense Urban n78")
-    area_km2 = st.number_input("Coverage Area (km²)", min_value=0.1, value=50.0, step=1.0)
-    center_lat = st.number_input("Center Latitude", value=10.780000, step=0.000001, format="%.6f")
-    center_lon = st.number_input("Center Longitude", value=106.700000, step=0.000001, format="%.6f")
+    project_name = st.text_input("Project Name", value="Dense Urban n78",
+        help="Tên dự án — dùng cho báo cáo và xuất file")
+    area_km2 = st.number_input("Coverage Area (km²)", min_value=0.1, value=50.0, step=1.0,
+        help="Diện tích vùng phủ sóng cần tính toán (km²)")
+    center_lat = st.number_input("Center Latitude", value=10.780000, step=0.000001, format="%.6f",
+        help="Vĩ độ tâm vùng phủ (ví dụ: 10.780000 cho TP.HCM)")
+    center_lon = st.number_input("Center Longitude", value=106.700000, step=0.000001, format="%.6f",
+        help="Kinh độ tâm vùng phủ (ví dụ: 106.700000 cho TP.HCM)")
 
     st.subheader("🏙️ Environment")
-    scenario = st.selectbox("Scenario", ["UMa", "UMi", "RMa", "InH"], index=0)
-    obstacle_density = st.selectbox("Obstacle Density", ["heavy", "medium", "light"], index=0)
-    coverage_prob = st.slider("Coverage Probability", min_value=0.80, max_value=0.99, value=0.95, step=0.01)
+    scenario = st.selectbox("Scenario", ["UMa", "UMi", "RMa", "InH"], index=0,
+        help="3GPP TR 38.901 mô hình truyền sóng: UMa (Urban Macro), UMi (Urban Micro), RMa (Rural Macro), InH (Indoor Hotspot)")
+    obstacle_density = st.selectbox("Obstacle Density", ["heavy", "medium", "light"], index=0,
+        help="Mật độ vật cản: heavy (đô thị dày), medium (ngoại ô), light (nông thôn)")
+    coverage_prob = st.slider("Coverage Probability", min_value=0.80, max_value=0.99, value=0.95, step=0.01,
+        help="Xác suất phủ sóng ở cell edge — 95% = 95% vị trí cell edge đạt SINR yêu cầu")
 
     st.subheader("📡 Base Station")
-    antenna_config = st.selectbox("Antenna Config", ["32T32R", "64T64R", "8T8R", "4T4R", "2T2R"], index=0)
+    antenna_config = st.selectbox("Antenna Config", ["32T32R", "64T64R", "8T8R", "4T4R", "2T2R"], index=0,
+        help="Cấu hình MIMO antenna: 64T64R (Massive MIMO), 32T32R, 8T8R (beamforming), 4T4R, 2T2R")
 
     # --- Radio catalog selection ---
     _catalog = _load_catalog()
@@ -79,14 +87,20 @@ with st.sidebar:
         _ant_match = next(a for a in _catalog["antennas"] if f"{a['vendor']} {a['model']}" == _ant_sel)
         st.caption(f"{_ant_match['description']} — {_ant_match.get('gain_dbi', '?')} dBi, {_ant_match.get('h_beamwidth_deg', '?')}° azimuth")
 
-    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_match["max_tx_power_w"]) if _radio_sel and _radio_match.get("max_tx_power_w") else 200.0, step=10.0)
-    bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0)
-    sectors = st.selectbox("Sectors", [1, 3, 6], index=1)
+    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_match["max_tx_power_w"]) if _radio_sel and _radio_match.get("max_tx_power_w") else 200.0, step=10.0,
+        help="Công suất phát tối đa mỗi sector (Watt) — tự động điền từ catalog Radio nếu chọn")
+    bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0,
+        help="Chiều cao anten trạm gốc so mặt đất (mét)")
+    sectors = st.selectbox("Sectors", [1, 3, 6], index=1,
+        help="Số sector mỗi trạm: 1 (omni), 3 (tri-sector phổ biến), 6 (hex-sector)")
 
     st.subheader("📶 Frequency")
-    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71"], index=0)
-    bandwidth_mhz = st.number_input("Bandwidth (MHz)", min_value=5.0, value=100.0, step=5.0)
-    scs_khz = st.selectbox("SCS (kHz)", [15, 30, 60, 120], index=1)
+    band = st.selectbox("NR Band", ["n78", "n77", "n41", "n1", "n3", "n8", "n28", "n25", "n71", "n257", "n258", "n261"], index=0,
+        help="3GPP NR band: n78/n77 (3.5GHz C-Band), n41 (2.5GHz), n1/n3 (FDD 2.1/1.8GHz), n257/n258/n261 (mmWave 28/39/28GHz)")
+    bandwidth_mhz = st.number_input("Bandwidth (MHz)", min_value=5.0, value=100.0, step=5.0,
+        help="Băng thông kênh — n78: 100MHz, n77: 100MHz, n41: up to 100MHz, mmWave: 50-400MHz")
+    scs_khz = st.selectbox("SCS (kHz)", [15, 30, 60, 120], index=1,
+        help="Subcarrier Spacing — 30kHz phổ biến n78/n77, 15kHz cho FDD low-band, 120kHz cho mmWave")
 
     # Auto-detect duplex from band data
     _bl_info = BandLookup()
@@ -95,22 +109,34 @@ with st.sidebar:
     tdd_dl_ratio = st.slider("TDD DL Ratio", min_value=0.5, max_value=0.9, value=0.70, step=0.05, disabled=(_band_duplex == "FDD"))
 
     st.subheader("📱 UE")
-    power_class = st.selectbox("Power Class", ["PC1", "PC2", "PC3", "PC4"], index=2)
-    ue_height_m = st.number_input("UE Height (m)", min_value=1.0, value=1.5, step=0.1)
-    ue_noise_figure = st.number_input("UE Noise Figure (dB)", min_value=0.0, value=7.0, step=0.5)
+    power_class = st.selectbox("Power Class", ["PC1", "PC2", "PC3", "PC4"], index=2,
+        help="3GPP UE Power Class: PC1 (31dBm macro), PC2 (26dBm), PC3 (23dBm phổ biến), PC4 (20dBm)")
+    ue_height_m = st.number_input("UE Height (m)", min_value=1.0, value=1.5, step=0.1,
+        help="Chiều cao thiết bị di động so mặt đất (mét)")
+    ue_noise_figure = st.number_input("UE Noise Figure (dB)", min_value=0.0, value=7.0, step=0.5,
+        help="Hệ số nhiễu nhiệt UE — 7dB là giá trị điển hình cho smartphone")
 
     st.subheader("📊 Margins")
-    interference_db = st.number_input("Interference Margin (dB)", min_value=0.0, value=3.0, step=0.5)
-    penetration_db = st.number_input("Penetration Loss (dB)", min_value=0.0, value=10.0, step=1.0)
-    rain_db = st.number_input("Rain Attenuation (dB)", min_value=0.0, value=1.0, step=0.5)
-    overlap_factor = st.number_input("Overlap Factor", min_value=0.0, max_value=0.5, value=0.25, step=0.05)
+    interference_db = st.number_input("Interference Margin (dB)", min_value=0.0, value=3.0, step=0.5,
+        help="Dự trù nhiễu đồng kênh — 3-6dB cho mạng đô thị dày, 1-2dB nông thôn")
+    penetration_db = st.number_input("Penetration Loss (dB)", min_value=0.0, value=10.0, step=1.0,
+        help="Suy hao xuyên tường — 10-15dB (thấp/ttrung), 20-30dB (dày)")
+    rain_db = st.number_input("Rain Attenuation (dB)", min_value=0.0, value=1.0, step=0.5,
+        help="Suy hao mưa — chỉ đáng kể ở tần số >10GHz (mmWave), gần như 0 ở 3.5GHz")
+    overlap_factor = st.number_input("Overlap Factor", min_value=0.0, max_value=0.5, value=0.25, step=0.05,
+        help="Hệ số chồng lấp giữa các sector — 0.25 = 25% vùng phủ chồng nhau")
 
     st.subheader("🎯 QoS")
-    primary_service = st.selectbox("Primary Service", ["mixed", "vonr", "video_hd", "video_4k", "data", "gaming", "iot"], index=0)
-    users_per_km2 = st.number_input("Users per km²", min_value=1.0, value=300.0, step=10.0)
-    dl_per_user_mbps = st.number_input("DL per User (Mbps)", min_value=0.5, value=20.0, step=1.0)
-    ul_per_user_mbps = st.number_input("UL per User (Mbps)", min_value=0.1, value=5.0, step=0.5)
-    concurrent_ratio = st.number_input("Concurrent Ratio", min_value=0.01, max_value=0.99, value=0.10, step=0.01)
+    primary_service = st.selectbox("Primary Service", ["mixed", "vonr", "video_hd", "video_4k", "data", "gaming", "iot"], index=0,
+        help="Dịch vụ chính: mixed (tổng hợp), vonr (Voice over NR), video_hd/4k, data (eMBB), gaming (URLLC), iot (mMTC)")
+    users_per_km2 = st.number_input("Users per km²", min_value=1.0, value=300.0, step=10.0,
+        help="Mật độ người dùng trên km² — 300 điển hình đô thị, 50-100 nông thôn")
+    dl_per_user_mbps = st.number_input("DL per User (Mbps)", min_value=0.5, value=20.0, step=1.0,
+        help="Tốc độ downlink yêu cầu mỗi user — 5-10Mbps (VoNR), 20Mbps (HD), 50+Mbps (4K)")
+    ul_per_user_mbps = st.number_input("UL per User (Mbps)", min_value=0.1, value=5.0, step=0.5,
+        help="Tốc độ uplink yêu cầu mỗi user — 1-3Mbps (VoNR), 5Mbps (video call)")
+    concurrent_ratio = st.number_input("Concurrent Ratio", min_value=0.01, max_value=0.99, value=0.10, step=0.01,
+        help="Tỷ lệ user đồng thời hoạt động — 0.1 = 10% user đang truyền dữ liệu cùng lúc")
 
     st.divider()
     run_button = st.button("🚀 Calculate", width="stretch", type="primary")
