@@ -4,8 +4,8 @@ import json
 import sys
 import os
 
-# Add parent to path so imports work when running standalone
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add project root to path so rf5g package imports work when running standalone
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import streamlit as st
 from rf5g.models.input_schema import RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig, FrequencyConfig, UEConfig, MarginsConfig, QoSConfig
