@@ -67,6 +67,23 @@ class TestSizeEndpoint:
         assert data["band"] == "n8"
         assert data["propagation"]["cell_radius_m"] > 0
 
+    def test_size_exposes_effective_tx_fields(self, client):
+        payload = {
+            "base_station": {
+                "tx_power_w": 200,
+                "antenna_config": "8T8R",
+                "radio_vendor": "Ericsson",
+                "radio_model": "Radio 8883",
+            }
+        }
+        resp = client.post("/size", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["tx_power_w"] == 320
+        assert data["input_tx_power_w"] == 200
+        assert data["input_antenna_config"] == "8T8R"
+        assert data["catalog_overrides_applied"] is True
+
 
 class TestQuickSize:
     """Test /size/quick endpoint."""

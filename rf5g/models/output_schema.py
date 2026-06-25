@@ -83,6 +83,10 @@ class SizingOutput(BaseModel):
     bandwidth_mhz: float
     antenna_config: str
     tx_power_w: float
+    input_antenna_config: str
+    input_tx_power_w: float
+    effective_antenna_gain_dbi: Optional[float] = None
+    catalog_overrides_applied: bool = False
     link_budget_dl: LinkBudgetResult
     link_budget_ul: LinkBudgetResult
     propagation: PropagationResult

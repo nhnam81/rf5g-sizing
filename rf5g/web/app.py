@@ -11,6 +11,7 @@ import streamlit as st
 from rf5g.models.input_schema import RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig, FrequencyConfig, UEConfig, MarginsConfig, QoSConfig
 from rf5g.models.output_schema import SizingOutput
 from rf5g.models.lookup_tables import BandLookup
+from rf5g.models.antenna_pattern import antenna_pattern_from_catalog, resolve_catalog_radio_total_tx_power_w
 from rf5g.cli import _run_sizing
 from rf5g.viz.coverage_map import generate_coverage_map, generate_interactive_map
 from rf5g.viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zones, plot_capacity_comparison
@@ -69,9 +70,17 @@ with st.sidebar:
     _radio_sel = st.selectbox("📻 Radio", _radio_options, index=0,
         help="Select a radio from the product catalog, or leave blank for manual config")
     _radio_match = None
+    _radio_total_tx_power_w = None
     if _radio_sel:
         _radio_match = next(r for r in _catalog["radios"] if f"{r['vendor']} {r['model']}" == _radio_sel)
-        st.caption(f"{_radio_match['description']} — {_radio_match.get('max_tx_power_w', '?')}W, {_radio_match.get('mimo_config', '?')}")
+        _radio_total_tx_power_w = resolve_catalog_radio_total_tx_power_w(_radio_match)
+        if _radio_match.get("max_total_power_w") is not None and _radio_match.get("max_tx_power_w") is not None and _radio_match.get("tx_ports"):
+            _power_caption = f"{_radio_match['max_tx_power_w']}W/port × {_radio_match['tx_ports']} = {_radio_total_tx_power_w:g}W total"
+        elif _radio_total_tx_power_w is not None:
+            _power_caption = f"{_radio_total_tx_power_w:g}W total"
+        else:
+            _power_caption = "TX power unavailable"
+        st.caption(f"{_radio_match['description']} — {_power_caption}, {_radio_match.get('mimo_config', '?')}")
         # Auto-fill antenna_config from MIMO config
         _mimo_map = {"2T2R": "2T2R", "4T4R": "4T4R", "8T8R": "8T8R", "32T32R": "32T32R", "64T64R": "64T64R"}
         _radio_mimo = _radio_match.get("mimo_config", "")
@@ -87,8 +96,8 @@ with st.sidebar:
         _ant_match = next(a for a in _catalog["antennas"] if f"{a['vendor']} {a['model']}" == _ant_sel)
         st.caption(f"{_ant_match['description']} — {_ant_match.get('gain_dbi', '?')} dBi, {_ant_match.get('h_beamwidth_deg', '?')}° azimuth")
 
-    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_match["max_tx_power_w"]) if _radio_sel and _radio_match.get("max_tx_power_w") else 200.0, step=10.0,
-        help="Công suất phát tối đa mỗi sector (Watt) — tự động điền từ catalog Radio nếu chọn")
+    tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_total_tx_power_w) if _radio_sel and _radio_total_tx_power_w is not None else 200.0, step=10.0,
+        help="Tổng công suất phát mỗi sector/radio (Watt), cộng trên tất cả TX ports — tự động điền từ catalog Radio nếu chọn")
     bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0,
         help="Chiều cao anten trạm gốc so mặt đất (mét)")
     sectors = st.selectbox("Sectors", [1, 3, 6], index=1,
@@ -247,6 +256,7 @@ if "result" not in st.session_state:
     st.stop()
 
 result: SizingOutput = st.session_state["result"]
+input_state: RFSizingInput = st.session_state["input"]
 
 # --- Results Display ---
 tab_overview, tab_link_budget, tab_coverage, tab_sinr, tab_capacity, tab_qos, tab_recs, tab_map, tab_charts = st.tabs([
@@ -437,6 +447,18 @@ with tab_map:
     center_lat_map = result.project_name and center_lat or 10.8231
     center_lon_map = result.project_name and center_lon or 106.6297
 
+    antenna_pattern_override = None
+    if input_state.base_station.antenna_vendor and input_state.base_station.antenna_model:
+        try:
+            freq_mhz = BandLookup().get_fc(result.band)
+            antenna_pattern_override = antenna_pattern_from_catalog(
+                input_state.base_station.antenna_vendor,
+                input_state.base_station.antenna_model,
+                freq_mhz=freq_mhz,
+            )
+        except Exception:
+            antenna_pattern_override = None
+
     with st.spinner("Generating map..."):
         try:
             folium_map = generate_interactive_map(
@@ -444,6 +466,7 @@ with tab_map:
                 center_lat=center_lat_map,
                 center_lon=center_lon_map,
                 custom_sites=custom_sites,
+                antenna_pattern_override=antenna_pattern_override,
                 site_meta=site_meta,
                 return_map=True,
             )

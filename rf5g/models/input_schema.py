@@ -23,7 +23,7 @@ class BaseStationConfig(BaseModel):
     radio_model: Optional[str] = Field(None, description="Radio model from catalog (e.g. 'Radio 8883', 'ORS')")
     antenna_vendor: Optional[str] = Field(None, description="Antenna vendor from catalog (e.g. 'Prose Technologies', 'Ericsson')")
     antenna_model: Optional[str] = Field(None, description="Antenna model from catalog (e.g. '2TB-21U-SR', 'KRE 101 2677/1')")
-    tx_power_w: float = Field(200.0, gt=0, description="Total TX power in watts")
+    tx_power_w: float = Field(200.0, gt=0, description="Total TX power per sector/radio in watts across all TX ports")
     height_m: float = Field(25.0, gt=0, description="BS antenna height in meters")
     sectors: Literal[1, 3, 6] = 3
     cable_loss_db: float = Field(1.0, ge=0, description="Feeder/cable loss in dB")

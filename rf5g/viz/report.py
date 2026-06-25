@@ -9,7 +9,10 @@ REPORT_TEMPLATE = """# 5G NR RF Coverage Sizing Report
 **Project:** {{ result.project_name }}
 **Date:** {{ timestamp }}
 **Scenario:** {{ result.environment }} | **Band:** {{ result.band }} {{ result.bandwidth_mhz | int }}MHz
-
+**Effective TX:** {{ result.tx_power_w }}W {{ result.antenna_config }}
+{% if result.input_tx_power_w != result.tx_power_w or result.input_antenna_config != result.antenna_config %}**Requested TX:** {{ result.input_tx_power_w }}W {{ result.input_antenna_config }}
+{% endif %}{% if result.effective_antenna_gain_dbi is not none %}**Effective Antenna Gain:** {{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi
+{% endif %}
 ---
 
 ## 1. Link Budget
@@ -112,7 +115,10 @@ tr:nth-child(even) { background: #f9f9f9; }
 <p><strong>Project:</strong> {{ result.project_name }} |
 <strong>Scenario:</strong> {{ result.environment }} |
 <strong>Band:</strong> {{ result.band }} {{ result.bandwidth_mhz | int }}MHz |
-<strong>TX:</strong> {{ result.tx_power_w }}W {{ result.antenna_config }}</p>
+<strong>Effective TX:</strong> {{ result.tx_power_w }}W {{ result.antenna_config }}
+{% if result.input_tx_power_w != result.tx_power_w or result.input_antenna_config != result.antenna_config %}<br><strong>Requested TX:</strong> {{ result.input_tx_power_w }}W {{ result.input_antenna_config }}
+{% endif %}{% if result.effective_antenna_gain_dbi is not none %}<br><strong>Effective Antenna Gain:</strong> {{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi
+{% endif %}</p>
 </div>
 
 <h2>1. Link Budget</h2>

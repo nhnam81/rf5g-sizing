@@ -949,6 +949,28 @@ def get_catalog_radio(vendor: str, model: str) -> dict:
     raise ValueError(f"Radio not found: {vendor} {model}. Available: {avail}")
 
 
+def resolve_catalog_radio_total_tx_power_w(radio: dict) -> Optional[float]:
+    """Resolve total conducted TX power in watts from a catalog radio entry."""
+    total_w = radio.get("max_total_power_w")
+    if total_w is not None:
+        return float(total_w)
+
+    total_w = radio.get("max_power_whole_w")
+    if total_w is not None:
+        return float(total_w)
+
+    total_w = radio.get("max_tx_power_w")
+    if total_w is not None:
+        return float(total_w)
+
+    return None
+
+
+def get_catalog_radio_total_tx_power_w(vendor: str, model: str) -> Optional[float]:
+    """Get normalized total conducted TX power in watts for a catalog radio."""
+    return resolve_catalog_radio_total_tx_power_w(get_catalog_radio(vendor, model))
+
+
 def antenna_pattern_from_catalog(vendor: str, model: str, freq_mhz: float = None) -> AntennaPattern:
     """Create AntennaPattern from catalog antenna entry.
 

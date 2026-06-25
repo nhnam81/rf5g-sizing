@@ -8,6 +8,7 @@ from rf5g.models.lookup_tables import BandLookup, PowerClassLookup, AntennaConfi
 from rf5g.engine.propagation import path_loss, invert_mapl_to_radius
 from rf5g.engine.link_budget import calculate_link_budget
 from rf5g.engine.site_estimator import estimate_sites
+from rf5g.models.antenna_pattern import get_catalog_radio, resolve_catalog_radio_total_tx_power_w
 from rf5g.cli import _run_sizing
 
 
@@ -102,6 +103,46 @@ class TestPRDWorkedExample:
         print(f"Cell edge SINR: {result.sinr.sinr_db:.1f} dB (CQI {result.sinr.cqi})")
         print(f"Propagation model: {result.propagation.model}")
         print(f"Path loss at radius: {result.propagation.path_loss_db:.1f} dB")
+
+
+class TestEffectiveOutputs:
+    """Effective output fields should match the values used in calculations."""
+
+    def test_catalog_radio_total_power_prefers_explicit_total(self):
+        radio = get_catalog_radio("Ericsson", "Radio 8883")
+        assert resolve_catalog_radio_total_tx_power_w(radio) == 320
+
+    def test_catalog_radio_total_power_falls_back_to_legacy_value(self):
+        radio = get_catalog_radio("Ericsson", "Radio 8883RW")
+        assert resolve_catalog_radio_total_tx_power_w(radio) == 320
+
+    def test_catalog_radio_override_is_reflected_in_output(self):
+        inp = RFSizingInput(base_station={
+            "tx_power_w": 200,
+            "antenna_config": "8T8R",
+            "radio_vendor": "Ericsson",
+            "radio_model": "Radio 8883",
+        })
+        result = _run_sizing(inp)
+
+        assert result.input_tx_power_w == 200
+        assert result.tx_power_w == 320
+        assert result.catalog_overrides_applied is True
+        assert result.link_budget_dl.tx_power_dbm == round(10 * math.log10(result.tx_power_w * 1000), 2)
+
+    def test_catalog_antenna_gain_is_exposed(self):
+        inp = RFSizingInput(base_station={
+            "antenna_config": "32T32R",
+            "antenna_vendor": "Prose Technologies",
+            "antenna_model": "2TB-21U-SR",
+        })
+        result = _run_sizing(inp)
+
+        assert result.input_antenna_config == "32T32R"
+        assert result.antenna_config == "32T32R"
+        assert result.effective_antenna_gain_dbi == 17.8
+        assert result.catalog_overrides_applied is True
+        assert result.link_budget_dl.tx_gain_db == 29.8
 
 
 class TestEdgeCases:

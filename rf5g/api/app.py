@@ -31,7 +31,7 @@ from ..cli import _run_sizing
 app = FastAPI(
     title="5G NR RF Coverage Sizing Tool",
     description="API for 5G NR RF coverage sizing — 3GPP TR 38.901",
-    version="1.2.0",
+    version="1.3.1",
 )
 
 # CORS for Streamlit frontend
@@ -75,7 +75,7 @@ async def root():
     """API info."""
     return {
         "name": "5G NR RF Coverage Sizing Tool",
-        "version": "1.2.0",
+        "version": "1.3.1",
         "docs": "/docs",
         "endpoints": ["/size", "/compare", "/map", "/report", "/charts", "/tables"],
     }

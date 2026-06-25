@@ -15,7 +15,7 @@ from .models.input_schema import RFSizingInput
 from .models.lookup_tables import BandLookup, PowerClassLookup, AntennaConfigLookup, SINRCQILookup, QoSLookup, ShadowFadingLookup
 from .models.output_schema import SizingOutput
 from .engine.propagation import path_loss, invert_mapl_to_radius, los_probability
-from .engine.link_budget import calculate_link_budget
+from .engine.link_budget import calculate_link_budget, resolve_effective_base_station
 from .engine.site_estimator import estimate_sites
 from .engine.sinr_mapper import map_sinr_to_cqi, calculate_cell_throughput, coverage_percentage
 from .engine.capacity import calculate_capacity
@@ -45,6 +45,8 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
     sinr_lookup = SINRCQILookup()
     qos_lookup = QoSLookup()
     sf_lookup = ShadowFadingLookup()
+
+    effective_bs = resolve_effective_base_station(inp, ant_lookup)
 
     # Calculate link budget
     dl_result, ul_result = calculate_link_budget(inp, band_lookup, pc_lookup, ant_lookup, sf_lookup)
@@ -133,8 +135,12 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
         environment=inp.environment.scenario,
         band=inp.frequency.band,
         bandwidth_mhz=inp.frequency.bandwidth_mhz,
-        antenna_config=inp.base_station.antenna_config,
-        tx_power_w=inp.base_station.tx_power_w,
+        antenna_config=effective_bs["antenna_config"],
+        tx_power_w=effective_bs["tx_power_w"],
+        input_antenna_config=inp.base_station.antenna_config,
+        input_tx_power_w=inp.base_station.tx_power_w,
+        effective_antenna_gain_dbi=effective_bs["antenna_gain_dbi"],
+        catalog_overrides_applied=effective_bs["catalog_overrides_applied"],
         link_budget_dl=dl_result,
         link_budget_ul=ul_result,
         propagation=prop,

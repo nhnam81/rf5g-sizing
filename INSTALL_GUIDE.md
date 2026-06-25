@@ -15,7 +15,7 @@
 
 ### 1. Run the Installer
 
-Double-click `rf5g-sizing-1.0.0-setup.exe`.
+Double-click `rf5g-sizing-1.3.1-setup.exe`.
 
 > ⚠️ **Windows SmartScreen**: If you see "Windows protected your PC", click **More info** → **Run anyway**. This appears because the app is not code-signed.
 
@@ -63,7 +63,7 @@ Some antivirus products may quarantine unsigned executables. Add an exclusion fo
 ## Silent Install (Advanced)
 
 ```cmd
-rf5g-sizing-1.0.0-setup.exe /VERYSILENT /DIR=C:\rf5g-sizing
+rf5g-sizing-1.3.1-setup.exe /VERYSILENT /DIR=C:\rf5g-sizing
 ```
 
 ## What's Installed

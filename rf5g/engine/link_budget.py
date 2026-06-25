@@ -14,9 +14,11 @@ def _resolve_catalog_params(inp: RFSizingInput) -> dict:
 
     if bs.radio_vendor and bs.radio_model:
         try:
-            from ..models.antenna_pattern import get_catalog_radio
+            from ..models.antenna_pattern import get_catalog_radio, resolve_catalog_radio_total_tx_power_w
             radio = get_catalog_radio(bs.radio_vendor, bs.radio_model)
-            overrides["tx_power_w"] = radio.get("max_tx_power_w", bs.tx_power_w)
+            total_tx_power_w = resolve_catalog_radio_total_tx_power_w(radio)
+            if total_tx_power_w is not None:
+                overrides["tx_power_w"] = total_tx_power_w
             overrides["radio_mimo"] = radio.get("mimo_config", bs.antenna_config)
             # If radio has mimo_config, suggest matching antenna_config
             mimo = radio.get("mimo_config", "")
@@ -62,6 +64,29 @@ def _resolve_catalog_params(inp: RFSizingInput) -> dict:
     return overrides
 
 
+def resolve_effective_base_station(
+    inp: RFSizingInput,
+    ant_lookup: AntennaConfigLookup,
+) -> dict:
+    """Resolve the effective BS parameters used by the sizing engine."""
+    bs_config = ant_lookup.get_config(inp.base_station.antenna_config)
+    catalog_overrides = _resolve_catalog_params(inp)
+
+    antenna_gain_override = catalog_overrides.get("antenna_gain_dbi")
+    if antenna_gain_override is not None:
+        # Replace antenna gain from catalog, keep MIMO/BF gains from config
+        bs_config = {**bs_config, "antenna_gain_dbi": antenna_gain_override}
+
+    return {
+        "antenna_config": inp.base_station.antenna_config,
+        "tx_power_w": catalog_overrides.get("tx_power_w", inp.base_station.tx_power_w),
+        "antenna_gain_dbi": bs_config["antenna_gain_dbi"],
+        "bs_config": bs_config,
+        "catalog_overrides_applied": bool(catalog_overrides),
+    }
+
+
+
 def calculate_link_budget(
     inp: RFSizingInput,
     band_lookup: BandLookup,
@@ -79,16 +104,10 @@ def calculate_link_budget(
     nrb = band_lookup.get_nrb(inp.frequency.bandwidth_mhz, inp.frequency.scs_khz)
     bw_hz = inp.frequency.bandwidth_mhz * 1e6
 
-    bs_config = ant_lookup.get_config(inp.base_station.antenna_config)
+    effective_bs = resolve_effective_base_station(inp, ant_lookup)
+    bs_config = effective_bs["bs_config"]
     ue_config = ant_lookup.get_ue_config()
-
-    # Apply catalog overrides if radio/antenna vendor+model specified
-    catalog_overrides = _resolve_catalog_params(inp)
-    tx_power_w = catalog_overrides.get("tx_power_w", inp.base_station.tx_power_w)
-    antenna_gain_override = catalog_overrides.get("antenna_gain_dbi")
-    if antenna_gain_override is not None:
-        # Replace antenna gain from catalog, keep MIMO/BF gains from config
-        bs_config = {**bs_config, "antenna_gain_dbi": antenna_gain_override}
+    tx_power_w = effective_bs["tx_power_w"]
 
     ue_tx_dbm = pc_lookup.get_tx_power_dbm(inp.user_equipment.power_class)
 

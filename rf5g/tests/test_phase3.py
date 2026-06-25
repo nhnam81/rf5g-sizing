@@ -4,8 +4,10 @@ import os
 import tempfile
 import pytest
 from rf5g.models.input_schema import RFSizingInput
+from rf5g.models.lookup_tables import BandLookup
+from rf5g.models.antenna_pattern import antenna_pattern_from_catalog
 from rf5g.cli import _run_sizing
-from rf5g.viz.coverage_map import generate_coverage_map
+from rf5g.viz.coverage_map import generate_coverage_map, generate_interactive_map
 from rf5g.viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zones, plot_capacity_comparison
 from rf5g.viz.report import generate_markdown_report, generate_html_report
 
@@ -39,6 +41,35 @@ class TestCoverageMap:
             assert os.path.exists(path)
             content = open(path, encoding="utf-8").read()
             assert "21.0" in content or "105.8" in content
+            import gc; gc.collect()
+            try:
+                os.unlink(path)
+            except PermissionError:
+                pass
+
+    def test_single_sector_catalog_panel_uses_directional_wedge(self):
+        """Single-sector catalog panel antennas should render directional coverage, not omni."""
+        inp = RFSizingInput(
+            base_station={
+                "antenna_config": "2T2R",
+                "antenna_vendor": "Prose Technologies",
+                "antenna_model": "S-Wave 40D-65-9D-64K-B2",
+                "sectors": 1,
+            },
+            frequency={"band": "n78", "bandwidth_mhz": 100.0, "scs_khz": 30},
+        )
+        result = _run_sizing(inp)
+        ant_pattern = antenna_pattern_from_catalog(
+            "Prose Technologies",
+            "S-Wave 40D-65-9D-64K-B2",
+            freq_mhz=BandLookup().get_fc(result.band),
+        )
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
+            path = generate_interactive_map(result, output_path=f.name, antenna_pattern_override=ant_pattern)
+            assert os.path.exists(path)
+            content = open(path, encoding="utf-8").read()
+            assert "1-Sector 65°" in content
+            assert "Omni coverage" not in content
             import gc; gc.collect()
             try:
                 os.unlink(path)

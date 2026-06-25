@@ -191,7 +191,7 @@ PARAM_HELP = {
     "environment.coverage_probability": "📊 **Xác suất phủ sóng** — Tỷ lệ cell edge user đạt throughput tối thiểu.\n\n"
                                       "• 0.90 (90%): Rural, yêu cầu thấp\n• 0.95 (95%): Tiêu chuẩn đô thị\n• 0.99 (99%): Indoor, mission-critical",
     # Base Station
-    "base_station.tx_power_w": "📡 **Công suất phát BS** (Watt) — EIRP = 10·log10(P) + antenna_gain.\n\n"
+    "base_station.tx_power_w": "📡 **Công suất phát BS** (Watt tổng / sector) — tổng công suất trên tất cả TX ports, dùng trực tiếp trong EIRP = 10·log10(P) + antenna_gain.\n\n"
                                "• 5W: Small cell, indoor\n• 40W: Rural macro\n• 100W: Urban macro\n• 200W: Dense urban, 32T32R+\n• 320W: 64T64R MU-MIMO",
     "base_station.antenna_config": "📶 **Cấu hình antenna** — Số TX/RX chains, ảnh hưởng gain và MIMO layers.\n\n"
                                   "• **2T2R**: Small cell, rural repeater. Gain thấp.\n• **4T4R**: Rural macro, low-cost. Gain ~11 dBi.\n• **8T8R**: Suburban, small cell. Gain ~14 dBi.\n• **16T16R**: Urban, mid-range. Gain ~17 dBi.\n• **32T32R**: Dense urban, MU-MIMO. Gain ~20 dBi.\n• **64T64R**: High-capacity urban. Gain ~23 dBi.",
@@ -394,16 +394,21 @@ with st.expander("📡 Base Station — Trạm phát", expanded=True):
             )
             if radio_model != "— Select —":
                 # Show radio specs
-                from rf5g.models.antenna_pattern import get_catalog_radio
+                from rf5g.models.antenna_pattern import get_catalog_radio, resolve_catalog_radio_total_tx_power_w
                 try:
                     r_spec = get_catalog_radio(radio_vendor, radio_model)
+                    total_tx_power_w = resolve_catalog_radio_total_tx_power_w(r_spec)
+                    if r_spec.get("max_total_power_w") is not None and r_spec.get("max_tx_power_w") is not None and r_spec.get("tx_ports"):
+                        power_caption = f"{r_spec['max_tx_power_w']}W/port × {r_spec['tx_ports']} = {total_tx_power_w:g}W total"
+                    elif total_tx_power_w is not None:
+                        power_caption = f"{total_tx_power_w:g}W total"
+                    else:
+                        power_caption = "TX power unavailable"
                     st.caption(f"📡 {r_spec['vendor']} {r_spec['model']}: {r_spec['mimo_config']}, "
-                              f"{r_spec['max_tx_power_w']}W/port ({r_spec['max_tx_power_dbm']} dBm), "
-                              f"{r_spec['frequency_bands']}, {r_spec['weight_kg']}kg")
+                              f"{power_caption}, {r_spec['frequency_bands']}, {r_spec['weight_kg']}kg")
                     # Auto-set tx_power_w and antenna_config from radio spec
-                    if r_spec.get("max_tx_power_w") and r_spec.get("tx_ports"):
-                        total_w = r_spec["max_tx_power_w"] * r_spec["tx_ports"]
-                        tx_power_w = total_w
+                    if total_tx_power_w is not None:
+                        tx_power_w = total_tx_power_w
                     if r_spec.get("mimo_config"):
                         mimo_map = {"2T2R": "2T2R", "4T4R": "4T4R", "8T8R": "8T8R",
                                     "16T16R": "16T16R", "32T32R": "32T32R", "64T64R": "64T64R"}
