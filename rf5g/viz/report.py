@@ -12,6 +12,10 @@ REPORT_TEMPLATE = """# 5G NR RF Coverage Sizing Report
 **Effective TX:** {{ result.tx_power_w }}W {{ result.antenna_config }}
 {% if result.input_tx_power_w != result.tx_power_w or result.input_antenna_config != result.antenna_config %}**Requested TX:** {{ result.input_tx_power_w }}W {{ result.input_antenna_config }}
 {% endif %}{% if result.effective_antenna_gain_dbi is not none %}**Effective Antenna Gain:** {{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi
+{% endif %}{% if result.radio_details %}**Radio Source:** {{ result.radio_details.vendor or 'unknown' }} {{ result.radio_details.model or '' }}{% if result.radio_details.source_pdf %} — {{ result.radio_details.source_pdf }}{% endif %}
+{% endif %}{% if result.antenna_details %}**Antenna Source:** {{ result.antenna_details.vendor or 'custom' }} {{ result.antenna_details.model or '' }}{% if result.antenna_details.source_pdf %} — {{ result.antenna_details.source_pdf }}{% endif %}
+{% if result.antenna_details.pattern_asset %}**Pattern Asset:** {{ result.antenna_details.pattern_asset }}
+{% endif %}{% endif %}{% if result.effective_pattern_source %}**Pattern Source:** {{ result.effective_pattern_source }}
 {% endif %}
 ---
 
@@ -118,6 +122,10 @@ tr:nth-child(even) { background: #f9f9f9; }
 <strong>Effective TX:</strong> {{ result.tx_power_w }}W {{ result.antenna_config }}
 {% if result.input_tx_power_w != result.tx_power_w or result.input_antenna_config != result.antenna_config %}<br><strong>Requested TX:</strong> {{ result.input_tx_power_w }}W {{ result.input_antenna_config }}
 {% endif %}{% if result.effective_antenna_gain_dbi is not none %}<br><strong>Effective Antenna Gain:</strong> {{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi
+{% endif %}{% if result.radio_details %}<br><strong>Radio Source:</strong> {{ result.radio_details.vendor or 'unknown' }} {{ result.radio_details.model or '' }}{% if result.radio_details.source_pdf %} — {{ result.radio_details.source_pdf }}{% endif %}
+{% endif %}{% if result.antenna_details %}<br><strong>Antenna Source:</strong> {{ result.antenna_details.vendor or 'custom' }} {{ result.antenna_details.model or '' }}{% if result.antenna_details.source_pdf %} — {{ result.antenna_details.source_pdf }}{% endif %}
+{% if result.antenna_details.pattern_asset %}<br><strong>Pattern Asset:</strong> {{ result.antenna_details.pattern_asset }}{% endif %}
+{% endif %}{% if result.effective_pattern_source %}<br><strong>Pattern Source:</strong> {{ result.effective_pattern_source }}
 {% endif %}</p>
 </div>
 

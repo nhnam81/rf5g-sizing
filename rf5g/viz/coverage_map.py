@@ -557,9 +557,73 @@ def generate_interactive_map(
     # ── Build Folium map ──
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_start, tiles="OpenStreetMap", width="100%", height=600)
 
+    # ── Draw planning overlays ──
+    if result.placement_plan and result.placement_plan.overlays:
+        overlays = result.placement_plan.overlays
+        if overlays.service_area:
+            service_coords = [(point.lat, point.lon) for point in overlays.service_area.outer]
+            folium.Polygon(
+                locations=service_coords,
+                color="#1E88E5",
+                fill=False,
+                weight=3,
+                popup="Service area",
+            ).add_to(m)
+            for hole in overlays.service_area.holes:
+                folium.Polygon(
+                    locations=[(point.lat, point.lon) for point in hole],
+                    color="#1E88E5",
+                    dash_array="5,5",
+                    fill=False,
+                    weight=2,
+                    popup="Service area hole",
+                ).add_to(m)
+        for exclusion in overlays.exclusion_zones:
+            folium.Polygon(
+                locations=[(point.lat, point.lon) for point in exclusion.polygon.outer],
+                color="#E53935",
+                fill=True,
+                fill_color="#E53935",
+                fill_opacity=0.12,
+                weight=2,
+                popup=f"Exclusion zone: {exclusion.reason}",
+            ).add_to(m)
+        for alignment in overlays.alignments:
+            folium.PolyLine(
+                locations=[(point.lat, point.lon) for point in alignment.points],
+                color="#6D4C41",
+                weight=3,
+                dash_array="6,4",
+                popup=f"Alignment: {alignment.alignment_type}",
+            ).add_to(m)
+        for traffic_zone in overlays.traffic_zones:
+            folium.Polygon(
+                locations=[(point.lat, point.lon) for point in traffic_zone.polygon.outer],
+                color="#FB8C00",
+                fill=True,
+                fill_color="#FB8C00",
+                fill_opacity=0.10,
+                weight=2,
+                popup=f"Traffic zone: {traffic_zone.name or 'weighted demand'} (x{traffic_zone.weight})",
+            ).add_to(m)
+
     # ── Generate sites ──
+    planned_site_meta = None
     if custom_sites:
         sites = custom_sites
+    elif result.placement_plan and result.placement_plan.selected_sites:
+        sites = [(site.lat, site.lon) for site in result.placement_plan.selected_sites]
+        planned_site_meta = [
+            {
+                "label": site.id,
+                "status": site.status,
+                "source": site.source,
+                "azimuths": list(site.azimuths_deg),
+                "beamwidth": site.beamwidth_deg,
+                "overloaded": site.overloaded,
+            }
+            for site in result.placement_plan.selected_sites
+        ]
     else:
         sites = generate_hex_grid(center_lat, center_lon, isd_km, n_sites)
 
@@ -570,13 +634,33 @@ def generate_interactive_map(
     for idx, (lat, lon) in enumerate(sites):
         site_color = sinr_color
 
-        # Per-site override from site_meta
+        # Per-site override from site_meta or placement plan
         site_azimuths = sector_azimuths  # default
         site_beamwidth = ant_p.beamwidth_h_deg  # default
         site_ant = ant_p  # default
         manual_sector = False
+        site_label = f"Site #{idx + 1}"
+        site_status = None
+        site_overloaded = False
 
-        if site_meta and idx < len(site_meta):
+        if planned_site_meta and idx < len(planned_site_meta):
+            pm = planned_site_meta[idx]
+            site_label = pm.get("label") or site_label
+            site_status = pm.get("status")
+            site_overloaded = bool(pm.get("overloaded"))
+            site_azimuths = pm.get("azimuths") or site_azimuths
+            if pm.get("beamwidth") is not None:
+                site_beamwidth = pm["beamwidth"]
+            if site_beamwidth < 359:
+                from rf5g.models.antenna_pattern import _cosine_pattern
+                site_ant = AntennaPattern(
+                    name=f"Planned-{site_beamwidth:.0f}deg",
+                    pattern_type="sector",
+                    beamwidth_h_deg=site_beamwidth,
+                    gain_max_dbi=ant_p.gain_max_dbi,
+                    horizontal_pattern=_cosine_pattern(site_beamwidth, ant_p.gain_max_dbi),
+                )
+        elif site_meta and idx < len(site_meta):
             sm = site_meta[idx]
             if sm.get("azimuth") is not None and sm.get("beamwidth") is not None:
                 # Manual sector: override azimuth and beamwidth for this site
@@ -602,7 +686,7 @@ def generate_interactive_map(
                 fill_color=sinr_color,
                 fill_opacity=0.15,
                 weight=1,
-                popup=f"Site #{idx + 1}<br>Omni coverage<br>R={cell_radius_km * 1000:.0f}m",
+                popup=f"{site_label}<br>{site_status + '<br>' if site_status else ''}Omni coverage<br>R={cell_radius_km * 1000:.0f}m",
             ).add_to(m)
         elif manual_sector:
             # Manual sector: purple wedge
@@ -613,7 +697,7 @@ def generate_interactive_map(
                 fill_color="#9C27B0",
                 fill_opacity=0.12,
                 weight=1,
-                popup=f"Site #{idx + 1}<br>Manual {site_beamwidth:.0f}° @ Az {site_azimuths[0]:.0f}°<br>R={cell_radius_km * 1000:.0f}m",
+                popup=f"{site_label}<br>{site_status + '<br>' if site_status else ''}Manual {site_beamwidth:.0f}° @ Az {site_azimuths[0]:.0f}°<br>R={cell_radius_km * 1000:.0f}m",
             ).add_to(m)
         elif len(site_azimuths) == 1:
             # Single sector directional: purple wedge
@@ -624,7 +708,7 @@ def generate_interactive_map(
                 fill_color="#9C27B0",
                 fill_opacity=0.12,
                 weight=1,
-                popup=f"Site #{idx + 1}<br>1-Sector {site_ant.beamwidth_h_deg:.0f}°<br>R={cell_radius_km * 1000:.0f}m",
+                popup=f"{site_label}<br>{site_status + '<br>' if site_status else ''}1-Sector {site_ant.beamwidth_h_deg:.0f}°<br>R={cell_radius_km * 1000:.0f}m",
             ).add_to(m)
         else:
             # Multi-sector: draw per-sector polygons
@@ -637,18 +721,19 @@ def generate_interactive_map(
                     fill_color=color,
                     fill_opacity=0.08,
                     weight=1,
-                    popup=f"Site #{idx + 1} Sector {s_idx + 1}<br>Azimuth {az}°<br>R={cell_radius_km * 1000:.0f}m",
+                    popup=f"{site_label} Sector {s_idx + 1}<br>{site_status + '<br>' if site_status else ''}Azimuth {az}°<br>R={cell_radius_km * 1000:.0f}m",
                 ).add_to(m)
 
         # Site marker (static fallback)
+        marker_color = "#D32F2F" if site_overloaded else site_color
         folium.CircleMarker(
             location=[lat, lon],
             radius=4,
-            color=site_color,
+            color=marker_color,
             fill=True,
-            fill_color=site_color,
+            fill_color=marker_color,
             fill_opacity=0.8,
-            tooltip=f"Site #{idx + 1}: {lat:.6f}, {lon:.6f}",
+            tooltip=f"{site_label}: {lat:.6f}, {lon:.6f}" + (" [OVERLOADED]" if site_overloaded else ""),
         ).add_to(m)
 
     # ── Inject config and JS ──

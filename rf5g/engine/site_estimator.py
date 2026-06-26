@@ -1,7 +1,7 @@
 """Site estimator — hexagonal grid and omnidirectional cell layout."""
 from __future__ import annotations
 import math
-from typing import Literal
+from ..models.antenna_pattern import AntennaPattern, derive_site_geometry_mode
 from ..models.output_schema import SiteEstimateResult
 
 
@@ -11,6 +11,7 @@ def estimate_sites(
     sectors: int = 3,
     overlap_factor: float = 0.25,
     limiting_link: str = "UL",
+    antenna_pattern: AntennaPattern | None = None,
 ) -> SiteEstimateResult:
     """Estimate number of sites from area and cell radius.
 
@@ -32,29 +33,29 @@ def estimate_sites(
     if area_km2 <= 0:
         raise ValueError("Area must be positive")
 
-    # Cell area per site
-    # 3-sector: hexagonal cell, each sector covers 120° → full 360° coverage
-    # 1-sector omni: 360° coverage (omnidirectional antenna)
-    # 6-sector: smaller cells, tighter frequency reuse
-    if sectors == 3:
-        # Hexagonal cell (3-sector)
-        cell_area_km2 = 2.598 * cell_radius_km ** 2
-    elif sectors == 1:
-        # Omnidirectional (360° coverage)
-        cell_area_km2 = math.pi * cell_radius_km ** 2
-    elif sectors == 6:
-        # 6-sector (rare)
-        cell_area_km2 = 1.299 * cell_radius_km ** 2
-    else:
+    if sectors not in {1, 3, 6}:
         raise ValueError(f"Sectors must be 1, 3, or 6, got {sectors}")
 
-    # Inter-site distance
-    if sectors == 3:
-        isd_km = math.sqrt(3) * cell_radius_km  # ISD = √3 × R for hexagonal
-    elif sectors == 1:
-        isd_km = 2.0 * cell_radius_km  # ISD = 2R for omni
+    pattern = antenna_pattern or AntennaPattern(name="fallback", pattern_type="omni", beamwidth_h_deg=360.0)
+    geometry_mode = derive_site_geometry_mode(sectors, pattern)
+
+    # Cell area per site
+    # sector_3: classic 3-sector hexagonal macro assumptions
+    # sector_6: denser multi-sector layout
+    # directional_1_sector: reduced effective footprint vs omni because one beam only covers one angular slice
+    if geometry_mode == "sector_3":
+        cell_area_km2 = 2.598 * cell_radius_km ** 2
+        isd_km = math.sqrt(3) * cell_radius_km
+    elif geometry_mode == "sector_6":
+        cell_area_km2 = 1.299 * cell_radius_km ** 2
+        isd_km = 1.5 * cell_radius_km
+    elif geometry_mode == "directional_1_sector":
+        beam_fraction = max(0.12, min(0.5, pattern.beamwidth_h_deg / 360.0))
+        cell_area_km2 = math.pi * cell_radius_km ** 2 * beam_fraction * 0.67
+        isd_km = max(0.8 * cell_radius_km, 2.0 * cell_radius_km * max(0.35, math.sqrt(beam_fraction) * 0.85))
     else:
-        isd_km = 1.5 * cell_radius_km  # ISD = 1.5R for 6-sector
+        cell_area_km2 = math.pi * cell_radius_km ** 2
+        isd_km = 2.0 * cell_radius_km
 
     # Number of sites (with overlap)
     n_sites_raw = area_km2 / cell_area_km2

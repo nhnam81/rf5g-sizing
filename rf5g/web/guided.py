@@ -12,11 +12,15 @@ import streamlit as st
 from rf5g.models.input_schema import (
     RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig,
     FrequencyConfig, UEConfig, MarginsConfig, QoSConfig,
+    GeoPoint, GeoPolygon, ExclusionZone, LinearAlignment, PlannedSiteInput,
+    PlacementConstraints, TrafficZone, SpatialCapacityConfig,
 )
 from rf5g.cli import _run_sizing
 from rf5g.viz.coverage_map import generate_coverage_map, generate_interactive_map, generate_hex_grid, export_sites_json, export_sites_csv, haversine_km, pattern_for_config
 from rf5g.viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zones, plot_capacity_comparison
 from rf5g.viz.report import generate_html_report, generate_markdown_report
+from rf5g.engine.geometry import line_length_km, polygon_area_km2
+from rf5g.engine.placement_planner import effective_planning_area_km2
 
 # ── Load Product Catalog ──
 try:
@@ -256,10 +260,94 @@ def init_state():
         "result": None,
         "input": None,
         "calculated": False,
+        "compare_runs": [],
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+
+
+def _approximate_service_area_polygon(center_lat: float, center_lon: float, area_km2: float, vertices: int = 16) -> dict:
+    radius_km = math.sqrt(area_km2 / math.pi)
+    points = []
+    for idx in range(vertices):
+        angle = 2 * math.pi * idx / vertices
+        lat = center_lat + radius_km * math.cos(angle) / 111.0
+        lon = center_lon + radius_km * math.sin(angle) / (111.320 * math.cos(math.radians(center_lat)))
+        points.append({"lat": round(lat, 6), "lon": round(lon, 6)})
+    return {"outer": points, "name": "Approximate service area"}
+
+
+def _parse_json_text(raw: str, expected_type: type, field_label: str):
+    if not raw.strip():
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{field_label}: JSON không hợp lệ ({exc})") from exc
+    if not isinstance(parsed, expected_type):
+        type_name = "object" if expected_type is dict else "array"
+        raise ValueError(f"{field_label}: phải là JSON {type_name}")
+    return parsed
+
+
+def _polygon_points_to_text(service_area: dict | None) -> str:
+    if not service_area or not service_area.get("outer"):
+        return ""
+    return "\n".join(f"{point['lat']:.6f}, {point['lon']:.6f}" for point in service_area["outer"])
+
+
+def _parse_polygon_points_text(raw: str, field_label: str) -> dict:
+    points = []
+    for line_no, raw_line in enumerate(raw.strip().splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [part.strip() for part in line.replace(";", ",").split(",") if part.strip()]
+        if len(parts) == 1:
+            parts = line.split()
+        if len(parts) < 2:
+            raise ValueError(f"{field_label}: dòng {line_no} phải có định dạng `lat, lon`")
+        try:
+            lat = float(parts[0])
+            lon = float(parts[1])
+        except ValueError as exc:
+            raise ValueError(f"{field_label}: dòng {line_no} có lat/lon không hợp lệ") from exc
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            raise ValueError(f"{field_label}: dòng {line_no} có lat/lon ngoài phạm vi")
+        points.append({"lat": round(lat, 6), "lon": round(lon, 6)})
+    if len(points) < 3:
+        raise ValueError(f"{field_label}: cần ít nhất 3 điểm để tạo polygon")
+    return {"outer": points, "name": "Ordered points polygon"}
+
+
+def _catalog_override_preview(radio_vendor: str | None, radio_model: str | None, ant_vendor: str | None, ant_model: str | None, manual_tx_power_w: float, manual_antenna_config: str) -> dict:
+    preview = {
+        "radio": None,
+        "antenna": None,
+        "effective_tx_power_w": manual_tx_power_w,
+        "effective_antenna_config": manual_antenna_config,
+        "notes": [],
+    }
+    if radio_vendor and radio_model:
+        try:
+            from rf5g.models.antenna_pattern import get_catalog_radio, resolve_catalog_radio_total_tx_power_w
+            radio = get_catalog_radio(radio_vendor, radio_model)
+            preview["radio"] = f"{radio['vendor']} {radio['model']}"
+            total_tx_power_w = resolve_catalog_radio_total_tx_power_w(radio)
+            if total_tx_power_w is not None and abs(total_tx_power_w - manual_tx_power_w) > 1e-6:
+                preview["effective_tx_power_w"] = total_tx_power_w
+                preview["notes"].append(f"Catalog radio override TX power → {total_tx_power_w:g}W")
+            mimo_config = radio.get("mimo_config")
+            if mimo_config and mimo_config != manual_antenna_config:
+                preview["effective_antenna_config"] = mimo_config
+                preview["notes"].append(f"Catalog radio suggests antenna config {mimo_config}")
+        except Exception:
+            pass
+    if ant_vendor and ant_model:
+        preview["antenna"] = f"{ant_vendor} {ant_model}"
+    return preview
+
 
 init_state()
 
@@ -291,6 +379,18 @@ for i, (key, val) in enumerate(EXAMPLES.items()):
 selected = st.session_state.get("selected_example")
 if selected and selected in EXAMPLES:
     st.info(EXAMPLES[selected]["desc"])
+
+planning_shell = st.radio(
+    "Chế độ làm việc",
+    ["Standard sizing", "Geometry-aware planning"],
+    horizontal=True,
+    index=1,
+    help="Standard sizing phù hợp sizing RF nhanh. Geometry-aware planning mở khóa polygon, exclusion, alignment, traffic zone và planning objective.",
+)
+if planning_shell == "Geometry-aware planning":
+    st.caption("🧭 Guided Mode đang hoạt động như một planning workflow cho Phase C/D.")
+else:
+    st.caption("⚡ Standard sizing giữ trải nghiệm cấu hình nhanh. Với planning nâng cao, nên dùng Geometry-aware planning.")
 
 st.divider()
 
@@ -347,6 +447,10 @@ else:
         "primary_service": "mixed", "users_per_km2": 300.0,
         "dl_per_user_mbps": 20.0, "ul_per_user_mbps": 5.0, "concurrent_ratio": 0.10,
     }
+
+loaded_config = st.session_state.get("loaded_config", {})
+loaded_placement = loaded_config.get("placement", {}) if isinstance(loaded_config, dict) else {}
+loaded_spatial = loaded_config.get("spatial_capacity", {}) if isinstance(loaded_config, dict) else {}
 
 # ── Project ──
 with st.expander("📍 Project — Thông tin dự án", expanded=True):
@@ -455,6 +559,42 @@ with st.expander("📡 Base Station — Trạm phát", expanded=True):
         ant_vendor = None
         antenna_model = None
 
+    st.markdown("---")
+    st.markdown("**🧪 Custom antenna pattern (optional)**")
+    custom_pattern_upload = st.file_uploader(
+        "Upload antenna pattern (.ant, .csv, .json, .msi, .txt)",
+        type=["ant", "csv", "json", "msi", "txt"],
+        key="guided_custom_pattern_upload",
+        help="Ưu tiên cao nhất: nếu upload custom pattern, runtime sẽ dùng pattern này thay vì catalog antenna pattern. Hữu ích cho antenna có radiation pattern đặc thù.",
+    )
+    custom_pattern_format = st.selectbox(
+        "Custom pattern format",
+        ["auto", "ant", "csv", "json", "msi", "atoll_txt"],
+        index=0,
+        help="Chọn format nếu muốn override auto-detection. `.txt` có thể là MSI-like hoặc Atoll text.",
+    )
+    custom_pattern_name = st.text_input(
+        "Custom pattern row/name (optional)",
+        value="",
+        help="Dùng khi file Atoll text có nhiều row/pattern và bạn muốn chỉ rõ row name.",
+    )
+    custom_pattern_freq_mhz = st.number_input(
+        "Custom pattern frequency hint (MHz)",
+        min_value=0.0,
+        value=0.0,
+        step=10.0,
+        help="Dùng để chọn row gần tần số nhất khi file pattern có nhiều frequency entries.",
+    )
+
+    _custom_pattern_file = None
+    if custom_pattern_upload is not None:
+        upload_dir = Path('/Users/namnguyen/rf5g-sizing/.tmp_import/custom_patterns')
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        upload_path = upload_dir / custom_pattern_upload.name
+        upload_path.write_bytes(custom_pattern_upload.getvalue())
+        _custom_pattern_file = str(upload_path)
+        st.caption(f"Loaded custom pattern asset: {upload_path.name}")
+
     # Collect catalog selections for build_input
     _catalog_radio_vendor = radio_vendor if (radio_vendor and radio_vendor != "— None —") else None
     _catalog_radio_model = radio_model if (radio_model and radio_model != "— Select —") else None
@@ -495,6 +635,117 @@ with st.expander("🎯 QoS — Chất lượng dịch vụ", expanded=True):
     ul_per_user_mbps = c4.number_input("UL per User (Mbps)", min_value=0.1, value=defaults["ul_per_user_mbps"], step=0.5, help=get_help("qos.ul_per_user_mbps"))
     concurrent_ratio = c5.number_input("Concurrent Ratio", min_value=0.01, max_value=0.99, value=defaults["concurrent_ratio"], step=0.01, help=get_help("qos.concurrent_ratio"))
 
+if planning_shell == "Geometry-aware planning":
+    st.markdown("### 🧭 Planning Inputs — Geometry & Strategy")
+    service_area_source = st.radio(
+        "Service area source",
+        ["Approximate circle from area + center", "Ordered points", "Paste polygon JSON"],
+        horizontal=True,
+        index=0 if not loaded_placement.get("service_area") else 2,
+        help="Approximate circle tạo polygon từ area + center. Ordered points cho phép nhập các điểm theo thứ tự. Paste polygon JSON dùng trực tiếp `GeoPolygon` từ planning schema.",
+    )
+    default_service_area_json = json.dumps(loaded_placement.get("service_area", {}), indent=2, ensure_ascii=False) if loaded_placement.get("service_area") else ""
+    default_service_area_points = _polygon_points_to_text(loaded_placement.get("service_area"))
+    if service_area_source == "Paste polygon JSON":
+        service_area_json = st.text_area(
+            "Service area polygon JSON",
+            value=default_service_area_json,
+            height=160,
+            placeholder='{"outer": [{"lat": 10.775, "lon": 106.695}, {"lat": 10.775, "lon": 106.705}, {"lat": 10.785, "lon": 106.705}, {"lat": 10.785, "lon": 106.695}], "name": "Target area"}',
+            help="Paste một `GeoPolygon` hợp lệ. Dùng khi bạn muốn planning theo hình học thực tế thay vì area+center approximation.",
+        )
+        service_area_points_text = ""
+    elif service_area_source == "Ordered points":
+        service_area_points_text = st.text_area(
+            "Service area points (lat, lon theo thứ tự)",
+            value=default_service_area_points,
+            height=160,
+            placeholder="10.517860, 107.014418\n10.507658, 107.034188\n10.498606, 107.009709\n10.495440, 107.001274\n10.502635, 107.001886",
+            help="Nhập mỗi dòng theo format `lat, lon`. Hệ thống sẽ giữ nguyên thứ tự các điểm để tạo polygon. Không cần lặp lại điểm đầu ở cuối.",
+        )
+        service_area_json = ""
+        st.caption("Ordered points phù hợp hơn cho người dùng nhập tay polygon nhanh mà không cần viết JSON.")
+    else:
+        service_area_json = ""
+        service_area_points_text = ""
+        st.caption("Service area sẽ được nội suy thành polygon hình tròn từ `area_km2` + `center_lat/lon`.")
+
+    with st.expander("🚧 Constraints — Exclusions, Alignments, Spacing", expanded=False):
+        exclusion_zones_json = st.text_area(
+            "Exclusion zones JSON",
+            value=json.dumps(loaded_placement.get("exclusion_zones", []), indent=2, ensure_ascii=False) if loaded_placement.get("exclusion_zones") else "",
+            height=140,
+            placeholder='[{"reason": "no_build", "polygon": {"outer": [{"lat": 10.779, "lon": 106.699}, {"lat": 10.779, "lon": 106.701}, {"lat": 10.781, "lon": 106.701}, {"lat": 10.781, "lon": 106.699}]}}]',
+        )
+        alignments_json = st.text_area(
+            "Alignments JSON",
+            value=json.dumps(loaded_placement.get("alignments", []), indent=2, ensure_ascii=False) if loaded_placement.get("alignments") else "",
+            height=140,
+            placeholder='[{"name": "Tunnel axis", "alignment_type": "tunnel", "preferred_spacing_m": 120, "points": [{"lat": 10.780, "lon": 106.695}, {"lat": 10.780, "lon": 106.705}]}]',
+        )
+        c1, c2, c3 = st.columns(3)
+        min_site_spacing_m = c1.number_input("Min site spacing (m)", min_value=0.0, value=float(loaded_placement.get("min_site_spacing_m") or 0.0), step=10.0)
+        edge_setback_m = c2.number_input("Edge setback (m)", min_value=0.0, value=float(loaded_placement.get("edge_setback_m") or 0.0), step=10.0)
+        outside_buffer_m = c3.number_input("Outside service area buffer (m)", min_value=0.0, value=float(loaded_placement.get("allow_outside_service_area_buffer_m") or 0.0), step=10.0)
+
+    with st.expander("📈 Demand shaping — Traffic zones & spatial capacity", expanded=False):
+        spatial_capacity_enabled = st.checkbox("Enable spatial capacity", value=bool(loaded_spatial.get("enabled", False)))
+        c1, c2, c3 = st.columns(3)
+        grid_resolution_m = c1.number_input("Grid resolution (m)", min_value=10.0, value=float(loaded_spatial.get("grid_resolution_m") or 100.0), step=10.0, disabled=not spatial_capacity_enabled)
+        hotspot_search_radius_m = c2.number_input("Hotspot search radius (m)", min_value=0.0, value=float(loaded_spatial.get("hotspot_search_radius_m") or 0.0), step=10.0, disabled=not spatial_capacity_enabled)
+        traffic_zones_json = st.text_area(
+            "Traffic zones JSON",
+            value=json.dumps(loaded_spatial.get("demand_zones", []), indent=2, ensure_ascii=False) if loaded_spatial.get("demand_zones") else "",
+            height=140,
+            placeholder='[{"name": "Hotspot", "weight": 8.0, "polygon": {"outer": [{"lat": 10.782, "lon": 106.702}, {"lat": 10.782, "lon": 106.705}, {"lat": 10.785, "lon": 106.705}, {"lat": 10.785, "lon": 106.702}]}}]',
+            disabled=not spatial_capacity_enabled,
+        )
+        c4, c5 = st.columns(2)
+        max_load_per_site_mbps_dl = c4.number_input("Max DL load per site (Mbps)", min_value=0.0, value=float(loaded_spatial.get("max_load_per_site_mbps_dl") or 0.0), step=10.0, disabled=not spatial_capacity_enabled)
+        max_load_per_site_mbps_ul = c5.number_input("Max UL load per site (Mbps)", min_value=0.0, value=float(loaded_spatial.get("max_load_per_site_mbps_ul") or 0.0), step=10.0, disabled=not spatial_capacity_enabled)
+
+    with st.expander("🎛️ Planning strategy — Objective & placement mode", expanded=True):
+        c1, c2 = st.columns(2)
+        placement_mode = c1.radio(
+            "Placement mode",
+            ["polygon_fill", "alignment_biased", "alignment_only", "hybrid"],
+            horizontal=False,
+            index=["polygon_fill", "alignment_biased", "alignment_only", "hybrid"].index(loaded_placement.get("placement_mode", "polygon_fill")),
+            help="polygon_fill phủ theo polygon; alignment_only bám tuyến; alignment_biased ưu tiên tuyến; hybrid trộn cả hai.",
+        )
+        planning_objective = c2.radio(
+            "Planning objective",
+            ["coverage_first", "balanced", "capacity_first"],
+            horizontal=False,
+            index=["coverage_first", "balanced", "capacity_first"].index(loaded_placement.get("objective", "balanced")),
+            help="coverage_first ưu tiên phủ sóng, capacity_first ưu tiên hotspot/capacity, balanced cân bằng cả hai.",
+        )
+
+    with st.expander("📍 Existing / planned sites", expanded=False):
+        planned_sites_json = st.text_area(
+            "Planned / locked / existing sites JSON",
+            value=json.dumps(loaded_placement.get("planned_sites", []), indent=2, ensure_ascii=False) if loaded_placement.get("planned_sites") else "",
+            height=140,
+            placeholder='[{"id": "locked-1", "lat": 10.776, "lon": 106.696, "status": "locked", "azimuth_deg": 90, "beamwidth_deg": 120}]',
+        )
+else:
+    service_area_source = "Approximate circle from area + center"
+    service_area_json = ""
+    exclusion_zones_json = ""
+    alignments_json = ""
+    min_site_spacing_m = 0.0
+    edge_setback_m = 0.0
+    outside_buffer_m = 0.0
+    spatial_capacity_enabled = False
+    grid_resolution_m = 100.0
+    hotspot_search_radius_m = 0.0
+    traffic_zones_json = ""
+    max_load_per_site_mbps_dl = 0.0
+    max_load_per_site_mbps_ul = 0.0
+    placement_mode = "polygon_fill"
+    planning_objective = "balanced"
+    planned_sites_json = ""
+
 st.divider()
 
 # ══════════════════════════════════════════════
@@ -530,6 +781,46 @@ def build_input_from_ui() -> RFSizingInput:
         base_station_kw["antenna_vendor"] = _catalog_ant_vendor
     if _catalog_ant_model:
         base_station_kw["antenna_model"] = _catalog_ant_model
+    if _custom_pattern_file:
+        base_station_kw["antenna_pattern_source"] = "file"
+        base_station_kw["antenna_pattern_file"] = _custom_pattern_file
+        base_station_kw["antenna_pattern_format"] = None if custom_pattern_format == "auto" else custom_pattern_format
+        base_station_kw["antenna_pattern_name"] = custom_pattern_name or None
+        base_station_kw["antenna_pattern_freq_mhz"] = custom_pattern_freq_mhz or None
+
+    placement_obj = None
+    spatial_capacity_obj = None
+    if planning_shell == "Geometry-aware planning":
+        if service_area_source == "Paste polygon JSON":
+            service_area_data = _parse_json_text(service_area_json, dict, "Service area")
+        elif service_area_source == "Ordered points":
+            service_area_data = _parse_polygon_points_text(service_area_points_text, "Service area points")
+        else:
+            service_area_data = _approximate_service_area_polygon(center_lat, center_lon, area_km2)
+        exclusion_data = _parse_json_text(exclusion_zones_json, list, "Exclusion zones") or []
+        alignment_data = _parse_json_text(alignments_json, list, "Alignments") or []
+        planned_site_data = _parse_json_text(planned_sites_json, list, "Planned sites") or []
+        placement_obj = PlacementConstraints(
+            service_area=GeoPolygon(**service_area_data),
+            exclusion_zones=[ExclusionZone(**item) for item in exclusion_data],
+            alignments=[LinearAlignment(**item) for item in alignment_data],
+            planned_sites=[PlannedSiteInput(**item) for item in planned_site_data],
+            min_site_spacing_m=min_site_spacing_m or None,
+            edge_setback_m=edge_setback_m,
+            allow_outside_service_area_buffer_m=outside_buffer_m,
+            placement_mode=placement_mode,
+            objective=planning_objective,
+        )
+        if spatial_capacity_enabled:
+            traffic_zone_data = _parse_json_text(traffic_zones_json, list, "Traffic zones") or []
+            spatial_capacity_obj = SpatialCapacityConfig(
+                enabled=True,
+                grid_resolution_m=grid_resolution_m,
+                hotspot_search_radius_m=hotspot_search_radius_m or None,
+                demand_zones=[TrafficZone(**item) for item in traffic_zone_data],
+                max_load_per_site_mbps_dl=max_load_per_site_mbps_dl or None,
+                max_load_per_site_mbps_ul=max_load_per_site_mbps_ul or None,
+            )
 
     return RFSizingInput(
         project=ProjectConfig(name=project_name, area_km2=area_km2, center_lat=center_lat, center_lon=center_lon),
@@ -546,7 +837,87 @@ def build_input_from_ui() -> RFSizingInput:
             dl_per_user_mbps=dl_per_user_mbps, ul_per_user_mbps=ul_per_user_mbps,
             concurrent_ratio=concurrent_ratio,
         ),
+        placement=placement_obj,
+        spatial_capacity=spatial_capacity_obj,
     )
+
+preview_error = None
+preview_input = None
+if "loaded_config" in st.session_state:
+    try:
+        preview_input = RFSizingInput(**st.session_state["loaded_config"])
+    except Exception as exc:
+        preview_error = f"Config đã load không hợp lệ: {exc}"
+else:
+    try:
+        preview_input = build_input_from_ui()
+    except Exception as exc:
+        preview_error = str(exc)
+
+st.markdown("#### 🧾 Pre-run assumptions summary")
+if preview_error:
+    st.error(preview_error)
+else:
+    summary_cols = st.columns(3)
+    summary_cols[0].markdown(
+        f"**Scope**\n\n"
+        f"- Project: `{preview_input.project.name}`\n"
+        f"- Scenario: `{preview_input.environment.scenario}` / `{preview_input.environment.obstacle_density}`\n"
+        f"- Band: `{preview_input.frequency.band}` {preview_input.frequency.bandwidth_mhz:.0f} MHz\n"
+        f"- Duplex/TDD ratio: `{preview_input.frequency.duplex}` / `{preview_input.frequency.tdd_dl_ratio:.2f}`"
+    )
+    catalog_preview = _catalog_override_preview(_catalog_radio_vendor, _catalog_radio_model, _catalog_ant_vendor, _catalog_ant_model, tx_power_w, antenna_config)
+    pattern_source_label = f"custom file ({Path(_custom_pattern_file).name})" if _custom_pattern_file else 'catalog/builtin'
+    summary_cols[1].markdown(
+        f"**Equipment**\n\n"
+        f"- TX power: `{catalog_preview['effective_tx_power_w']:.1f} W`\n"
+        f"- Antenna config: `{catalog_preview['effective_antenna_config']}`\n"
+        f"- Radio: `{catalog_preview['radio'] or 'manual'}`\n"
+        f"- Antenna: `{catalog_preview['antenna'] or 'manual'}`\n"
+        f"- Pattern source: `{pattern_source_label}`"
+    )
+    placement = preview_input.placement
+    spatial_capacity = preview_input.spatial_capacity
+    if planning_shell == "Geometry-aware planning" and placement:
+        service_area_km2 = polygon_area_km2(placement.service_area)
+        excluded_area_km2 = sum(polygon_area_km2(zone.polygon) for zone in placement.exclusion_zones)
+        alignment_length = sum(line_length_km(alignment) for alignment in placement.alignments)
+        summary_cols[2].markdown(
+            f"**Planning**\n\n"
+            f"- Service area: `{service_area_km2:.3f} km²`\n"
+            f"- Exclusions: `{len(placement.exclusion_zones)}` (`{excluded_area_km2:.3f} km²`)\n"
+            f"- Alignments: `{len(placement.alignments)}` (`{alignment_length:.3f} km`)\n"
+            f"- Objective / mode: `{placement.objective}` / `{placement.placement_mode}`\n"
+            f"- Traffic zones: `{len(spatial_capacity.demand_zones) if spatial_capacity else 0}`"
+        )
+    else:
+        summary_cols[2].markdown(
+            f"**Planning**\n\n"
+            f"- Workflow: `{planning_shell}`\n"
+            f"- Service polygon: `disabled`\n"
+            f"- Objective: `n/a`\n"
+            f"- Traffic zones: `0`"
+        )
+
+    validation_msgs = []
+    if planning_shell == "Geometry-aware planning" and placement:
+        if placement.placement_mode == "alignment_only" and not placement.alignments:
+            validation_msgs.append(("error", "`alignment_only` cần ít nhất một alignment."))
+        if placement.objective == "capacity_first" and (not spatial_capacity or not spatial_capacity.enabled or not spatial_capacity.demand_zones):
+            validation_msgs.append(("warning", "`capacity_first` đang bật nhưng chưa có traffic zone — planner sẽ khó thể hiện hotspot-aware behavior."))
+        if abs(preview_input.project.area_km2 - service_area_km2) / max(service_area_km2, 1e-6) > 0.5:
+            validation_msgs.append(("warning", f"`area_km2` ({preview_input.project.area_km2:.2f}) lệch đáng kể so với polygon area ({service_area_km2:.2f})."))
+    for note in catalog_preview["notes"]:
+        validation_msgs.append(("info", note))
+    if validation_msgs:
+        for level, msg in validation_msgs:
+            getattr(st, level)(msg)
+    else:
+        st.success("Ready — assumptions hợp lệ để chạy planning/sizing.")
+
+    current_input = st.session_state.get("input")
+    if current_input is not None and current_input.model_dump() != preview_input.model_dump():
+        st.warning("Inputs đã thay đổi kể từ lần calculate gần nhất — hãy chạy lại để đồng bộ kết quả và các tab summary/map.")
 
 if run_button or st.session_state.get("calculated"):
     with st.spinner("Đang tính toán..."):
@@ -590,10 +961,76 @@ if result.capacity:
     m7.metric("Capacity", "✅ Đủ" if cap_ok else "❌ Thiếu", help=f"{result.capacity.total_capacity_dl_gbps:.1f} Gbps supply vs {result.capacity.total_demand_dl_gbps:.1f} Gbps demand")
     m8.metric("Total Sites", f"{result.capacity.total_sites}", help="Tổng sites = max(coverage_sites, capacity_sites)")
 
+if result.placement_plan:
+    st.markdown("#### 🧭 Executive planning summary")
+    plan = result.placement_plan
+    exec_cols = st.columns(4)
+    exec_cols[0].metric("Selected sites", f"{plan.metrics.selected_sites}")
+    exec_cols[1].metric("Coverage ratio", f"{plan.metrics.coverage_ratio:.1%}")
+    exec_cols[2].metric("Effective planning area", f"{plan.metrics.service_area_km2:.2f} km²")
+    if plan.spatial_capacity:
+        exec_cols[3].metric("Unserved DL", f"{plan.spatial_capacity.unserved_dl_gbps:.3f} Gbps")
+    else:
+        exec_cols[3].metric("Rejected candidates", f"{plan.metrics.rejected_candidates}")
+    summary_lines = [
+        f"Planner mode: **{plan.mode}**",
+        f"Coverage target achieved: **{plan.metrics.coverage_ratio:.1%}** over **{plan.metrics.service_area_km2:.2f} km²** usable area.",
+        f"Selected **{plan.metrics.selected_sites}** sites with **{plan.metrics.locked_sites}** locked/existing preserved.",
+    ]
+    if plan.metrics.excluded_area_km2 > 0:
+        summary_lines.append(f"Exclusion zones removed **{plan.metrics.excluded_area_km2:.2f} km²** from the usable area.")
+    if plan.metrics.alignment_length_km > 0:
+        summary_lines.append(f"Alignment input contributed **{plan.metrics.alignment_length_km:.2f} km** corridor guidance.")
+    if plan.spatial_capacity:
+        summary_lines.append(
+            f"Spatial capacity: **{plan.spatial_capacity.unserved_dl_gbps:.3f} Gbps DL** unserved across **{plan.spatial_capacity.hotspot_tiles}** hotspot tiles, overloaded sites = **{plan.spatial_capacity.overloaded_sites}**."
+        )
+    if result.catalog_overrides_applied:
+        summary_lines.append(
+            f"Catalog overrides applied — effective TX **{result.tx_power_w:.1f} W**, input TX **{result.input_tx_power_w:.1f} W**, antenna gain **{result.effective_antenna_gain_dbi or 0:.1f} dBi**."
+        )
+    if getattr(result, 'effective_pattern_source', None):
+        summary_lines.append(f"Pattern source: **{result.effective_pattern_source}**")
+    st.markdown("\n\n".join(f"- {line}" for line in summary_lines))
+
 # ── Detailed Tabs ──
-tab_lb, tab_cov, tab_sinr, tab_cap, tab_qos, tab_rec, tab_map, tab_chart, tab_export = st.tabs([
-    "📡 Link Budget", "🗺️ Coverage", "📶 SINR", "📦 Capacity", "✅ QoS", "💡 Recommendations", "🗺️ Map", "📈 Charts", "📥 Export",
+tab_exec, tab_lb, tab_cov, tab_sinr, tab_cap, tab_qos, tab_rec, tab_plan, tab_map, tab_chart, tab_compare, tab_export = st.tabs([
+    "🧭 Executive Summary", "📡 Link Budget", "🗺️ Coverage", "📶 SINR", "📦 Capacity", "✅ QoS", "💡 Recommendations", "📍 Placement Plan", "🗺️ Map & Geometry", "📈 Charts", "🔀 Comparison", "📥 Export",
 ])
+
+with tab_exec:
+    st.markdown("### Executive Summary")
+    st.write(f"**Project:** {result.project_name} | **Scenario:** {result.environment} | **Band:** {result.band} {result.bandwidth_mhz:.0f} MHz")
+    st.write(f"**Effective TX:** {result.tx_power_w:.1f} W | **Antenna Config:** {result.antenna_config} | **Limiting Link:** {result.site_estimate.limiting_link}")
+    if result.catalog_overrides_applied:
+        st.info(
+            f"Catalog override đang hoạt động — Input TX {result.input_tx_power_w:.1f} W / Input antenna {result.input_antenna_config} → Effective TX {result.tx_power_w:.1f} W / Gain {result.effective_antenna_gain_dbi or 0:.1f} dBi"
+        )
+    radio_details = getattr(result, 'radio_details', None)
+    antenna_details = getattr(result, 'antenna_details', None)
+    if radio_details:
+        st.caption(f"Radio source: {radio_details.vendor or 'unknown'} {radio_details.model or ''}{' — ' + radio_details.source_pdf if radio_details.source_pdf else ''}")
+    if antenna_details:
+        st.caption(f"Antenna source: {antenna_details.vendor or 'custom'} {antenna_details.model or ''}{' — ' + antenna_details.source_pdf if antenna_details.source_pdf else ''}")
+        if antenna_details.pattern_asset:
+            st.caption(f"Pattern asset: {antenna_details.pattern_asset}")
+    if getattr(result, 'effective_pattern_source', None):
+        st.caption(f"Pattern source: {result.effective_pattern_source}")
+    if result.placement_plan:
+        metric_rows = [
+            {"Metric": "Placement mode", "Value": result.placement_plan.mode},
+            {"Metric": "Selected sites", "Value": result.placement_plan.metrics.selected_sites},
+            {"Metric": "Coverage ratio", "Value": f"{result.placement_plan.metrics.coverage_ratio:.1%}"},
+            {"Metric": "Alignment length", "Value": f"{result.placement_plan.metrics.alignment_length_km:.2f} km"},
+            {"Metric": "Rejected candidates", "Value": result.placement_plan.metrics.rejected_candidates},
+        ]
+        if result.placement_plan.spatial_capacity:
+            metric_rows.extend([
+                {"Metric": "Unserved DL", "Value": f"{result.placement_plan.spatial_capacity.unserved_dl_gbps:.3f} Gbps"},
+                {"Metric": "Hotspot tiles", "Value": result.placement_plan.spatial_capacity.hotspot_tiles},
+                {"Metric": "Overloaded sites", "Value": result.placement_plan.spatial_capacity.overloaded_sites},
+            ])
+        st.dataframe(metric_rows, use_container_width=True, hide_index=True)
 
 with tab_lb:
     st.markdown("### Link Budget — Suy hao cho phép tối đa")
@@ -677,9 +1114,24 @@ with tab_cap:
             ],
         }
         st.dataframe(cap_data, use_container_width=True, hide_index=True)
+        if result.placement_plan and result.placement_plan.metrics.selected_sites == 0:
+            st.warning("Planner hiện chưa chọn được site nào. Capacity summary bên dưới chỉ phản ánh phép tính RF/capacity nền, không phải một placement plan hợp lệ.")
         if not result.capacity.capacity_sufficient:
             st.error(f"❌ **Capacity không đủ**: Cần thêm {result.capacity.additional_sites_needed} sites "
                      f"({result.capacity.total_capacity_dl_gbps:.1f} Gbps supply < {result.capacity.total_demand_dl_gbps:.1f} Gbps demand)")
+        if result.placement_plan and result.placement_plan.spatial_capacity:
+            st.markdown("#### Spatial capacity")
+            sc = result.placement_plan.spatial_capacity
+            st.dataframe([
+                {"Tham số": "Demand DL", "Giá trị": f"{sc.demand_dl_gbps:.3f} Gbps"},
+                {"Tham số": "Served DL", "Giá trị": f"{sc.served_dl_gbps:.3f} Gbps"},
+                {"Tham số": "Unserved DL", "Giá trị": f"{sc.unserved_dl_gbps:.3f} Gbps"},
+                {"Tham số": "Demand UL", "Giá trị": f"{sc.demand_ul_gbps:.3f} Gbps"},
+                {"Tham số": "Served UL", "Giá trị": f"{sc.served_ul_gbps:.3f} Gbps"},
+                {"Tham số": "Unserved UL", "Giá trị": f"{sc.unserved_ul_gbps:.3f} Gbps"},
+                {"Tham số": "Hotspot Tiles", "Giá trị": sc.hotspot_tiles},
+                {"Tham số": "Overloaded Sites", "Giá trị": sc.overloaded_sites},
+            ], use_container_width=True, hide_index=True)
     else:
         st.info("Capacity calculation không khả dụng.")
 
@@ -707,8 +1159,83 @@ with tab_rec:
     else:
         st.info("Không có đề xuất đặc biệt.")
 
+with tab_plan:
+    st.markdown("### Placement Plan — Kế hoạch đặt site")
+    if result.placement_plan:
+        metrics_rows = [
+            {"Metric": "Service area", "Value": f"{result.placement_plan.metrics.service_area_km2:.3f} km²"},
+            {"Metric": "Covered area", "Value": f"{result.placement_plan.metrics.covered_area_km2:.3f} km²"},
+            {"Metric": "Coverage ratio", "Value": f"{result.placement_plan.metrics.coverage_ratio:.1%}"},
+            {"Metric": "Excluded area", "Value": f"{result.placement_plan.metrics.excluded_area_km2:.3f} km²"},
+            {"Metric": "Candidate sites", "Value": result.placement_plan.metrics.candidate_sites},
+            {"Metric": "Selected sites", "Value": result.placement_plan.metrics.selected_sites},
+            {"Metric": "Locked sites", "Value": result.placement_plan.metrics.locked_sites},
+            {"Metric": "Rejected candidates", "Value": result.placement_plan.metrics.rejected_candidates},
+        ]
+        st.dataframe(metrics_rows, use_container_width=True, hide_index=True)
+
+        if result.placement_plan.metrics.selected_sites == 0:
+            st.error("Planner không chọn được site nào với cấu hình hiện tại.")
+            top_reasons = [candidate for candidate in result.placement_plan.candidates if not candidate.accepted][:3]
+            if top_reasons:
+                st.caption("Top rejection reasons:")
+                for candidate in top_reasons:
+                    st.write(f"- **{candidate.id}**: {' | '.join(candidate.reasons)}")
+            st.info("Gợi ý: giảm `min_site_spacing_m`, đổi `placement_mode`, tăng service area, hoặc dùng manual preview để kiểm tra geometry/site assumptions.")
+
+        st.markdown("#### ✅ Selected sites")
+        selected_rows = []
+        for site in result.placement_plan.selected_sites:
+            selected_rows.append({
+                "ID": site.id,
+                "Source": site.source,
+                "Status": site.status,
+                "Lat": round(site.lat, 6),
+                "Lon": round(site.lon, 6),
+                "Azimuths": ", ".join(f"{az:.0f}°" for az in site.azimuths_deg) if site.azimuths_deg else "-",
+                "Beamwidth": f"{site.beamwidth_deg:.0f}°" if site.beamwidth_deg else "-",
+                "DL load": f"{site.estimated_dl_load_mbps:.1f} Mbps" if site.estimated_dl_load_mbps is not None else "-",
+                "UL load": f"{site.estimated_ul_load_mbps:.1f} Mbps" if site.estimated_ul_load_mbps is not None else "-",
+                "Overloaded": "⚠️" if site.overloaded else "",
+            })
+        st.dataframe(selected_rows, use_container_width=True, hide_index=True)
+
+        rejected = [candidate for candidate in result.placement_plan.candidates if not candidate.accepted]
+        if rejected:
+            st.markdown("#### ❌ Rejected candidates")
+            rejected_rows = []
+            for candidate in rejected[:100]:
+                rejected_rows.append({
+                    "ID": candidate.id,
+                    "Source": candidate.source,
+                    "Score": f"{candidate.score:.2f}" if candidate.score is not None else "-",
+                    "Reasons": " | ".join(candidate.reasons),
+                })
+            st.dataframe(rejected_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("Planning output chưa khả dụng cho scenario hiện tại.")
+
 with tab_map:
-    st.markdown("### Coverage Map — Bản đồ phủ sóng")
+    st.markdown("### Map & Geometry — Bản đồ planning")
+    if result.placement_plan:
+        map_summary_cols = st.columns(4)
+        map_summary_cols[0].metric("Usable area", f"{result.placement_plan.metrics.service_area_km2:.2f} km²")
+        map_summary_cols[1].metric("Excluded area", f"{result.placement_plan.metrics.excluded_area_km2:.2f} km²")
+        map_summary_cols[2].metric("Alignment length", f"{result.placement_plan.metrics.alignment_length_km:.2f} km")
+        overload_count = result.placement_plan.spatial_capacity.overloaded_sites if result.placement_plan.spatial_capacity else 0
+        map_summary_cols[3].metric("Overloaded sites", f"{overload_count}")
+        st.caption("Map sẽ overlay service area, exclusion zones, alignments, traffic zones và selected sites từ planner. Bạn vẫn có thể override tạm thời bằng manual sites bên dưới để review nhanh.")
+
+    map_source = st.radio(
+        "Map source",
+        ["Planner result", "Manual site preview"],
+        horizontal=True,
+        help="Planner result hiển thị selected sites từ placement plan. Manual site preview chỉ dùng để review thủ công và KHÔNG thay đổi selected_sites trong planner.",
+    )
+    if map_source == "Planner result" and result.placement_plan and result.placement_plan.metrics.selected_sites == 0:
+        st.warning("Planner result hiện có 0 selected sites. Nếu muốn review hình học thủ công, chuyển sang Manual site preview.")
+    elif map_source == "Manual site preview":
+        st.info("Bạn đang xem manual preview. Các số liệu selected sites / coverage ratio ở trên vẫn thuộc planner result, không đổi theo manual sites bên dưới.")
 
     # ── Custom site input ──
     st.markdown("**📍 Nhập site thủ công** — format: `lat, lon` hoặc `lat, lon, azimuth, beamwidth` — 6 chữ số thập phân:")
@@ -724,7 +1251,7 @@ with tab_map:
     # Parse custom sites with azimuth/beamwidth support
     custom_sites = None
     custom_site_meta = None  # list of {azimuth, beamwidth} per site
-    if custom_sites_text.strip():
+    if map_source == "Manual site preview" and custom_sites_text.strip():
         parsed = []
         meta = []
         for line in custom_sites_text.strip().split("\n"):
@@ -860,8 +1387,11 @@ with tab_map:
 
     with st.spinner("Đang tạo bản đồ..."):
         try:
-            if custom_sites:
+            if map_source == "Manual site preview" and custom_sites:
                 fmap = generate_interactive_map(result, center_lat=center_lat, center_lon=center_lon, custom_sites=custom_sites, antenna_pattern_override=ant_pattern, return_map=True, site_meta=custom_site_meta)
+            elif map_source == "Manual site preview" and not custom_sites:
+                st.info("Chưa có manual sites hợp lệ. Đang fallback về planner result.")
+                fmap = generate_coverage_map(result, center_lat=center_lat, center_lon=center_lon, antenna_pattern_override=ant_pattern, return_map=True)
             elif "Capacity Sites" in map_view and n_cap > n_cov:
                 cap_sites = generate_hex_grid(center_lat, center_lon, isd_km, n_cap)
                 fmap = generate_interactive_map(result, center_lat=center_lat, center_lon=center_lon, custom_sites=cap_sites, antenna_pattern_override=ant_pattern, return_map=True)
@@ -940,16 +1470,46 @@ with tab_chart:
             except Exception as e:
                 st.error(f"Lỗi: {e}")
 
+with tab_compare:
+    st.markdown("### Comparison — So sánh scenario")
+    compare_col1, compare_col2, compare_col3 = st.columns(3)
+    if compare_col1.button("➕ Add current run to comparison", use_container_width=True):
+        current_input = st.session_state.get("input")
+        objective_label = current_input.placement.objective if current_input and current_input.placement else "legacy"
+        mode_label = current_input.placement.placement_mode if current_input and current_input.placement else "legacy"
+        st.session_state["compare_runs"].append({
+            "name": result.project_name,
+            "objective": objective_label,
+            "placement_mode": mode_label,
+            "coverage_ratio": result.placement_plan.metrics.coverage_ratio if result.placement_plan else None,
+            "selected_sites": result.placement_plan.metrics.selected_sites if result.placement_plan else result.site_estimate.coverage_sites,
+            "unserved_dl_gbps": result.placement_plan.spatial_capacity.unserved_dl_gbps if result.placement_plan and result.placement_plan.spatial_capacity else None,
+            "hotspot_tiles": result.placement_plan.spatial_capacity.hotspot_tiles if result.placement_plan and result.placement_plan.spatial_capacity else None,
+            "overloaded_sites": result.placement_plan.spatial_capacity.overloaded_sites if result.placement_plan and result.placement_plan.spatial_capacity else None,
+            "limiting_link": result.site_estimate.limiting_link,
+        })
+    if compare_col2.button("🧬 Duplicate current scenario snapshot", use_container_width=True):
+        snapshot = st.session_state.get("input", build_input_from_ui()).model_dump()
+        st.session_state["compare_runs"].append({"name": f"{result.project_name} (snapshot)", "snapshot": snapshot})
+    if compare_col3.button("🗑️ Clear comparison", use_container_width=True):
+        st.session_state["compare_runs"] = []
+
+    compare_runs = st.session_state.get("compare_runs", [])
+    if compare_runs:
+        st.dataframe(compare_runs, use_container_width=True, hide_index=True)
+    else:
+        st.info("Chưa có scenario nào trong comparison set. Hãy add current run hoặc duplicate snapshot để so sánh objective / placement mode.")
+
 with tab_export:
-    st.markdown("### Export — Xuất kết quả")
+    st.markdown("### Export — Xuất planning package")
     json_str = result.model_dump_json(indent=2)
     col_j, col_h, col_m = st.columns(3)
 
     with col_j:
         st.download_button(
-            "📥 JSON Result",
+            "📥 Planning Summary JSON",
             data=json_str,
-            file_name=f"rf5g_{result.project_name.replace(' ', '_')}.json",
+            file_name=f"{result.project_name.replace(' ', '_')}_summary.json",
             mime="application/json",
         )
 
@@ -973,15 +1533,35 @@ with tab_export:
             mime="text/markdown",
         )
 
-    # Also show current config for saving
     st.divider()
-    st.markdown("#### 💾 Lưu cấu hình hiện tại")
+    st.markdown("#### 💾 Scenario & planning inputs")
     current_config = st.session_state.get("input", build_input_from_ui()).model_dump()
     config_json = json.dumps(current_config, indent=2, ensure_ascii=False)
     st.code(config_json, language="json")
     st.download_button(
-        "💾 Download Config JSON",
+        "💾 Download Scenario JSON",
         data=config_json,
-        file_name=f"config_{result.project_name.replace(' ', '_')}.json",
+        file_name=f"{result.project_name.replace(' ', '_')}_scenario.json",
         mime="application/json",
     )
+
+    if result.placement_plan:
+        st.markdown("#### 📍 Selected sites package")
+        selected_sites_json = json.dumps([site.model_dump() for site in result.placement_plan.selected_sites], indent=2, ensure_ascii=False)
+        st.download_button(
+            "📥 Selected Sites JSON",
+            data=selected_sites_json,
+            file_name=f"{result.project_name.replace(' ', '_')}_selected-sites.json",
+            mime="application/json",
+        )
+
+    compare_runs = st.session_state.get("compare_runs", [])
+    if compare_runs:
+        st.markdown("#### 🔀 Comparison export")
+        compare_json = json.dumps(compare_runs, indent=2, ensure_ascii=False)
+        st.download_button(
+            "📤 Download Comparison JSON",
+            data=compare_json,
+            file_name=f"{result.project_name.replace(' ', '_')}_comparison.json",
+            mime="application/json",
+        )

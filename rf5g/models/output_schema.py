@@ -1,7 +1,9 @@
 """Output schema for rf5g — Pydantic v2 models."""
 from __future__ import annotations
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field
+
+from .input_schema import ExclusionZone, GeoPolygon, LinearAlignment, TrafficZone
 
 
 class LinkBudgetResult(BaseModel):
@@ -75,6 +77,83 @@ class CapacityResult(BaseModel):
     additional_sites_needed: int
 
 
+class CandidateSiteResult(BaseModel):
+    id: str
+    lat: float
+    lon: float
+    source: str
+    accepted: bool
+    reasons: list[str] = Field(default_factory=list)
+    score: Optional[float] = None
+    azimuths_deg: list[float] = Field(default_factory=list)
+    beamwidth_deg: Optional[float] = None
+    status: Optional[str] = None
+
+
+class EquipmentSourceResult(BaseModel):
+    vendor: Optional[str] = None
+    model: Optional[str] = None
+    source_pdf: Optional[str] = None
+    import_confidence: Optional[str] = None
+    pattern_source_type: Optional[str] = None
+    pattern_asset: Optional[str] = None
+    pattern_source: Optional[str] = None
+
+
+class SelectedSiteResult(BaseModel):
+    id: str
+    lat: float
+    lon: float
+    source: str
+    azimuths_deg: list[float] = Field(default_factory=list)
+    beamwidth_deg: Optional[float] = None
+    status: str = "selected"
+    coverage_area_km2: Optional[float] = None
+    estimated_dl_load_mbps: Optional[float] = None
+    estimated_ul_load_mbps: Optional[float] = None
+    overloaded: bool = False
+
+
+class PlacementMetrics(BaseModel):
+    service_area_km2: float
+    covered_area_km2: float
+    coverage_ratio: float
+    excluded_area_km2: float = 0.0
+    candidate_sites: int = 0
+    selected_sites: int = 0
+    locked_sites: int = 0
+    rejected_candidates: int = 0
+    alignment_length_km: float = 0.0
+
+
+class SpatialCapacityResult(BaseModel):
+    demand_dl_gbps: float
+    served_dl_gbps: float
+    unserved_dl_gbps: float
+    demand_ul_gbps: float
+    served_ul_gbps: float
+    unserved_ul_gbps: float
+    hotspot_tiles: int = 0
+    overloaded_sites: int = 0
+    capacity_sufficient_spatial: bool = True
+
+
+class GeometryOverlay(BaseModel):
+    service_area: Optional[GeoPolygon] = None
+    exclusion_zones: list[ExclusionZone] = Field(default_factory=list)
+    alignments: list[LinearAlignment] = Field(default_factory=list)
+    traffic_zones: list[TrafficZone] = Field(default_factory=list)
+
+
+class PlacementPlanResult(BaseModel):
+    mode: str
+    metrics: PlacementMetrics
+    selected_sites: list[SelectedSiteResult] = Field(default_factory=list)
+    candidates: list[CandidateSiteResult] = Field(default_factory=list)
+    overlays: Optional[GeometryOverlay] = None
+    spatial_capacity: Optional[SpatialCapacityResult] = None
+
+
 class SizingOutput(BaseModel):
     """Complete output of 5G RF sizing calculation."""
     project_name: str
@@ -86,12 +165,16 @@ class SizingOutput(BaseModel):
     input_antenna_config: str
     input_tx_power_w: float
     effective_antenna_gain_dbi: Optional[float] = None
+    effective_pattern_source: Optional[str] = None
+    radio_details: Optional[EquipmentSourceResult] = None
+    antenna_details: Optional[EquipmentSourceResult] = None
     catalog_overrides_applied: bool = False
     link_budget_dl: LinkBudgetResult
     link_budget_ul: LinkBudgetResult
     propagation: PropagationResult
     site_estimate: SiteEstimateResult
     sinr: SINRResult
-    qos_verification: List[QoSVerificationResult] = []
+    qos_verification: list[QoSVerificationResult] = Field(default_factory=list)
     capacity: Optional[CapacityResult] = None
-    recommendations: List[str] = []
+    recommendations: list[str] = Field(default_factory=list)
+    placement_plan: Optional[PlacementPlanResult] = None

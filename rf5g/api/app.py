@@ -27,11 +27,13 @@ from ..viz.coverage_map import (
 from ..viz.charts import plot_link_budget, plot_sinr_heatmap, plot_service_zones, plot_capacity_comparison
 from ..viz.report import generate_markdown_report, generate_html_report
 from ..cli import _run_sizing
+from ..engine.geometry import line_length_km, polygon_area_km2
+from ..engine.placement_planner import effective_planning_area_km2
 
 app = FastAPI(
     title="5G NR RF Coverage Sizing Tool",
     description="API for 5G NR RF coverage sizing — 3GPP TR 38.901",
-    version="1.3.1",
+    version="1.4.0",
 )
 
 # CORS for Streamlit frontend
@@ -75,9 +77,9 @@ async def root():
     """API info."""
     return {
         "name": "5G NR RF Coverage Sizing Tool",
-        "version": "1.3.1",
+        "version": "1.4.0",
         "docs": "/docs",
-        "endpoints": ["/size", "/compare", "/map", "/report", "/charts", "/tables"],
+        "endpoints": ["/size", "/placement/plan", "/geometry/validate", "/compare", "/map", "/report", "/charts", "/tables"],
     }
 
 
@@ -87,6 +89,42 @@ async def size(input_data: RFSizingInput):
     try:
         result = _run_sizing(input_data)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/placement/plan", response_model=SizingOutput, tags=["planning"])
+async def placement_plan(input_data: RFSizingInput):
+    """Run geometry-aware placement planning when placement inputs are provided."""
+    try:
+        return _run_sizing(input_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/geometry/validate", tags=["planning"])
+async def validate_geometry(input_data: RFSizingInput):
+    """Validate planning geometry inputs and summarize derived metrics."""
+    try:
+        placement = input_data.placement
+        if not placement or not placement.service_area:
+            return {
+                "valid": False,
+                "message": "No placement.service_area provided",
+            }
+        spatial_capacity = input_data.spatial_capacity
+        return {
+            "valid": True,
+            "service_area_km2": round(polygon_area_km2(placement.service_area), 3),
+            "effective_planning_area_km2": round(effective_planning_area_km2(input_data), 3),
+            "exclusion_zones": len(placement.exclusion_zones),
+            "excluded_area_km2": round(sum(polygon_area_km2(zone.polygon) for zone in placement.exclusion_zones), 3),
+            "alignments": len(placement.alignments),
+            "alignment_length_km": round(sum(line_length_km(alignment) for alignment in placement.alignments), 3),
+            "planned_sites": len(placement.planned_sites),
+            "spatial_capacity_enabled": bool(spatial_capacity and spatial_capacity.enabled),
+            "traffic_zones": len(spatial_capacity.demand_zones) if spatial_capacity else 0,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

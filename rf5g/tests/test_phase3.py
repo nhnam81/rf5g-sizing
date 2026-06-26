@@ -64,6 +64,7 @@ class TestCoverageMap:
             "S-Wave 40D-65-9D-64K-B2",
             freq_mhz=BandLookup().get_fc(result.band),
         )
+        assert ant_pattern.source == "catalog:atoll"
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
             path = generate_interactive_map(result, output_path=f.name, antenna_pattern_override=ant_pattern)
             assert os.path.exists(path)
@@ -75,6 +76,47 @@ class TestCoverageMap:
                 os.unlink(path)
             except PermissionError:
                 pass
+
+    def test_catalog_msi_pattern_uses_real_asset(self):
+        ant_pattern = antenna_pattern_from_catalog(
+            "Ericsson",
+            "KRE 101 2571/1 (Antenna 9011)",
+            freq_mhz=3500,
+        )
+        assert ant_pattern.source == "catalog:msi"
+        assert ant_pattern.horizontal_pattern
+        assert ant_pattern.beamwidth_h_deg > 0
+
+    def test_catalog_atoll_pattern_uses_real_asset(self):
+        ant_pattern = antenna_pattern_from_catalog(
+            "Prose Technologies",
+            "2W2TC-21VMSR",
+            freq_mhz=3500,
+        )
+        assert ant_pattern.source == "catalog:atoll"
+        assert ant_pattern.horizontal_pattern
+        assert ant_pattern.beamwidth_h_deg > 0
+
+    def test_custom_pattern_source_is_reported(self):
+        inp = RFSizingInput(
+            base_station={
+                "antenna_config": "2T2R",
+                "antenna_pattern_source": "file",
+                "antenna_pattern_file": "/Users/namnguyen/Downloads/42. Radio and Antenna/Antenna Products/Prose Panel Antenna Outdoor S-Wave 40D-65-9D-64K-B2 Atoll.txt",
+                "antenna_pattern_format": "atoll_txt",
+            },
+            frequency={"band": "n78", "bandwidth_mhz": 100.0, "scs_khz": 30},
+        )
+        result = _run_sizing(inp)
+        html = generate_html_report(result)
+        content = open(html, encoding="utf-8").read()
+        assert "Pattern Source" in content
+        assert "custom:atoll_txt" in content
+        import gc; gc.collect()
+        try:
+            os.unlink(html)
+        except PermissionError:
+            pass
 
 
 class TestCharts:

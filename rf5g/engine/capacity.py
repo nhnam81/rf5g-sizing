@@ -16,6 +16,7 @@ def calculate_capacity(
     coverage_sites: int,
     band_lookup: BandLookup | None = None,
     sinr_lookup: SINRCQILookup | None = None,
+    area_km2: float | None = None,
 ) -> CapacityResult:
     """Calculate capacity dimensioning.
 
@@ -73,7 +74,7 @@ def calculate_capacity(
     total_ul_gbps = cell_ul_mbps * coverage_sites / 1000.0
 
     # User demand
-    area = inp.project.area_km2
+    area = area_km2 if area_km2 is not None else inp.project.area_km2
     users_per_km2 = inp.qos.users_per_km2
     concurrent = inp.qos.concurrent_ratio
     total_users = int(users_per_km2 * area * concurrent)

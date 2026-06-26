@@ -6,9 +6,9 @@ from pathlib import Path
 from rf5g.models.input_schema import RFSizingInput
 from rf5g.models.lookup_tables import BandLookup, PowerClassLookup, AntennaConfigLookup, SINRCQILookup, QoSLookup, ShadowFadingLookup
 from rf5g.engine.propagation import path_loss, invert_mapl_to_radius
-from rf5g.engine.link_budget import calculate_link_budget
+from rf5g.engine.link_budget import calculate_link_budget, resolve_effective_base_station
 from rf5g.engine.site_estimator import estimate_sites
-from rf5g.models.antenna_pattern import get_catalog_radio, resolve_catalog_radio_total_tx_power_w
+from rf5g.models.antenna_pattern import antenna_pattern_from_catalog, get_catalog_radio, resolve_catalog_radio_total_tx_power_w
 from rf5g.cli import _run_sizing
 
 
@@ -143,6 +143,47 @@ class TestEffectiveOutputs:
         assert result.effective_antenna_gain_dbi == 17.8
         assert result.catalog_overrides_applied is True
         assert result.link_budget_dl.tx_gain_db == 29.8
+
+    def test_catalog_pattern_resolution_prefers_real_asset(self):
+        inp = RFSizingInput(
+            base_station={
+                "antenna_config": "2T2R",
+                "antenna_vendor": "Prose Technologies",
+                "antenna_model": "S-Wave 40D-65-9D-64K-B2",
+            },
+            frequency={"band": "n78", "bandwidth_mhz": 100.0, "scs_khz": 30},
+        )
+        effective_bs = resolve_effective_base_station(inp, AntennaConfigLookup())
+        assert effective_bs["pattern"].source == "catalog:atoll"
+        assert effective_bs["pattern"].horizontal_pattern
+
+    def test_imported_prose_radio_metadata_is_available(self):
+        radio = get_catalog_radio("Prose Technologies", "ORU-46-Q77M4-N-64F-D-04")
+        assert radio["max_total_power_w"] == 160
+        assert radio["mimo_config"] == "4T4R"
+        assert radio["source_pdf"] == "Prose Radio ORU-46-Q77M4-N-64F-D-04.pdf"
+
+    def test_imported_prose_atoll_antenna_uses_real_pattern(self):
+        pattern = antenna_pattern_from_catalog("Prose Technologies", "2W2TC-21VMSR", freq_mhz=3500)
+        assert pattern.source == "catalog:atoll"
+        assert pattern.horizontal_pattern
+        assert pattern.beamwidth_h_deg > 0
+
+    def test_custom_pattern_file_takes_precedence_over_catalog_pattern(self):
+        inp = RFSizingInput(
+            base_station={
+                "antenna_config": "2T2R",
+                "antenna_vendor": "Prose Technologies",
+                "antenna_model": "S-Wave 40D-65-9D-64K-B2",
+                "antenna_pattern_source": "file",
+                "antenna_pattern_file": "/Users/namnguyen/Downloads/42. Radio and Antenna/Antenna Products/Prose Panel Antenna Outdoor 2W2TC-21VMSR Atoll.txt",
+                "antenna_pattern_format": "atoll_txt",
+            },
+            frequency={"band": "n78", "bandwidth_mhz": 100.0, "scs_khz": 30},
+        )
+        effective_bs = resolve_effective_base_station(inp, AntennaConfigLookup())
+        assert effective_bs["pattern"].source == "custom:atoll_txt"
+        assert effective_bs["antenna_gain_dbi"] == effective_bs["pattern"].gain_max_dbi
 
 
 class TestEdgeCases:

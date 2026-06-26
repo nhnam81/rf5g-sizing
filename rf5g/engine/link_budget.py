@@ -69,6 +69,7 @@ def resolve_effective_base_station(
     ant_lookup: AntennaConfigLookup,
 ) -> dict:
     """Resolve the effective BS parameters used by the sizing engine."""
+    from ..models.antenna_pattern import resolve_antenna_pattern
     bs_config = ant_lookup.get_config(inp.base_station.antenna_config)
     catalog_overrides = _resolve_catalog_params(inp)
 
@@ -77,11 +78,27 @@ def resolve_effective_base_station(
         # Replace antenna gain from catalog, keep MIMO/BF gains from config
         bs_config = {**bs_config, "antenna_gain_dbi": antenna_gain_override}
 
+    try:
+        freq_mhz = None
+        try:
+            freq_mhz = BandLookup().get_fc(inp.frequency.band)
+        except Exception:
+            freq_mhz = None
+        antenna_pattern = resolve_antenna_pattern(inp.base_station, freq_mhz=freq_mhz)
+    except Exception:
+        from ..models.antenna_pattern import pattern_for_config
+        antenna_pattern = pattern_for_config(inp.base_station.antenna_config)
+
+    if inp.base_station.antenna_pattern_file and antenna_pattern.gain_max_dbi:
+        bs_config = {**bs_config, "antenna_gain_dbi": antenna_pattern.gain_max_dbi}
+
     return {
         "antenna_config": inp.base_station.antenna_config,
         "tx_power_w": catalog_overrides.get("tx_power_w", inp.base_station.tx_power_w),
         "antenna_gain_dbi": bs_config["antenna_gain_dbi"],
         "bs_config": bs_config,
+        "pattern": antenna_pattern,
+        "pattern_source": antenna_pattern.source,
         "catalog_overrides_applied": bool(catalog_overrides),
     }
 

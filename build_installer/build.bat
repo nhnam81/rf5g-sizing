@@ -86,6 +86,6 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   Build complete!
-echo   Installer: %PROJECT_DIR%\dist\rf5g-sizing-1.3.1-setup.exe
+echo   Installer: %PROJECT_DIR%\dist\rf5g-sizing-1.4.0-setup.exe
 echo ============================================
 pause

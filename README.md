@@ -4,7 +4,7 @@
 
 ## Quick Start (Windows)
 
-1. Double-click `rf5g-sizing-1.3.1-setup.exe`
+1. Double-click `rf5g-sizing-1.4.0-setup.exe`
 2. Follow the installer wizard
 3. Launch from Desktop shortcut or Start Menu
 4. Browser opens automatically at `http://localhost:8501`

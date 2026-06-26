@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
@@ -289,6 +290,15 @@ ANTENNA_CONFIG_PATTERN_MAP: dict[str, str] = {
 }
 
 
+def derive_site_geometry_mode(sectors: int, pattern: AntennaPattern) -> str:
+    """Classify the effective site geometry from sector count and pattern shape."""
+    if sectors == 1:
+        return "omni_360" if pattern.pattern_type == "omni" or pattern.beamwidth_h_deg >= 359 else "directional_1_sector"
+    if sectors >= 6:
+        return "sector_6"
+    return "sector_3"
+
+
 # ── Atoll .ant File Parser ──
 
 def parse_atoll_ant(filepath: str) -> AntennaPattern:
@@ -551,7 +561,7 @@ def get_pattern(pattern_name: str) -> AntennaPattern:
     """Get antenna pattern by name or file path.
 
     Args:
-        pattern_name: Built-in name ("omni", "panel_120", etc.) or file path (.ant, .csv, .json)
+        pattern_name: Built-in name ("omni", "panel_120", etc.) or file path (.ant, .csv, .json, .msi, .txt)
 
     Returns:
         AntennaPattern
@@ -569,8 +579,12 @@ def get_pattern(pattern_name: str) -> AntennaPattern:
             return parse_csv_pattern(pattern_name)
         elif ext == ".json":
             return parse_json_pattern(pattern_name)
+        elif ext == ".msi":
+            return parse_msi_pattern(pattern_name)
+        elif ext == ".txt":
+            return parse_atoll_txt(pattern_name)
         else:
-            raise ValueError(f"Unsupported file format: {ext}. Use .ant, .csv, or .json")
+            raise ValueError(f"Unsupported file format: {ext}. Use .ant, .csv, .json, .msi, or .txt")
 
     # Check antenna config mapping
     if pattern_name in ANTENNA_CONFIG_PATTERN_MAP:
@@ -579,7 +593,7 @@ def get_pattern(pattern_name: str) -> AntennaPattern:
     raise ValueError(
         f"Unknown pattern: {pattern_name}. "
         f"Built-in: {list(BUILTIN_PATTERNS.keys())}. "
-        f"Or provide file path (.ant, .csv, .json)"
+        f"Or provide file path (.ant, .csv, .json, .msi, .txt)"
     )
 
 
@@ -741,13 +755,13 @@ def parse_msi_pattern(filepath: str) -> AntennaPattern:
                     freq_mhz = float(line.split()[1])
                 except (IndexError, ValueError):
                     pass
-            elif "GAIN" in upper and "DBI" in upper:
-                # "GAIN dBi 17.8" or "GAIN  17.8 dBi" or "GAIN 10.14 dBi"
+            elif "GAIN" in upper and ("DBI" in upper or "DBD" in upper):
+                # "GAIN dBi 17.8" / "GAIN 7.35 dBd"
                 parts = line.split()
                 for p in parts:
                     try:
                         val = float(p)
-                        gain_max = val
+                        gain_max = val + 2.15 if "DBD" in upper else val
                         break
                     except ValueError:
                         continue
@@ -821,77 +835,130 @@ def parse_msi_pattern(filepath: str) -> AntennaPattern:
 
 # ── Atoll Tab-Separated Parser ──
 
-def parse_atoll_txt(filepath: str, antenna_name: str = None) -> AntennaPattern:
+def parse_atoll_txt(filepath: str, antenna_name: str = None, freq_mhz: float = None) -> AntennaPattern:
     """Parse Atoll tab-separated antenna file.
 
-    Atoll format: header row (tab-separated), then data rows.
-    First row = column names, subsequent rows = antenna data with inline patterns.
+    Supports files where the main radiation pattern is stored inline in a
+    dedicated `Pattern` column, together with beamwidth / tilt metadata.
     """
-    name = antenna_name or os.path.basename(filepath).replace(".txt", "")
-    freq_mhz = 3500.0
-    gain_max = 0.0
-    h_pattern = {}
-    h_bw = 65.0
-    v_bw = 10.0
-    ftb = 25.0
-    tilt = 0.0
+    rows = []
+    fallback_name = antenna_name or os.path.basename(filepath).replace(".txt", "")
 
     with open(filepath, encoding="utf-8", errors="ignore") as f:
         header = f.readline().strip().split("\t")
-        name_idx = gain_idx = bw_idx = None
-        for i, col in enumerate(header):
-            cl = col.lower().strip()
-            if cl == "name":
-                name_idx = i
-            elif cl == "gain":
-                gain_idx = i
-            elif cl in ("h_width", "beamwidth"):
-                bw_idx = i
+        index_map = {col.lower().strip(): idx for idx, col in enumerate(header)}
 
-        for line in f:
-            line = line.strip()
+        def _find_idx(*candidates: str):
+            for idx, col in enumerate(header):
+                cl = col.lower().strip()
+                if any(candidate in cl for candidate in candidates):
+                    return idx
+            return None
+
+        name_idx = _find_idx("name")
+        gain_idx = _find_idx("gain")
+        pattern_idx = _find_idx("pattern")
+        beam_idx = _find_idx("beamwidth")
+        h_idx = _find_idx("h_width")
+        v_idx = _find_idx("v_width")
+        freq_idx = _find_idx("frequency")
+        ftb_idx = _find_idx("front_to_back")
+        tilt_idx = _find_idx("tilt")
+
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
-            cols = line.split("\t")
-            if name_idx is not None and len(cols) > name_idx:
-                row_name = cols[name_idx]
-                if antenna_name and row_name != antenna_name:
-                    continue
-                if not antenna_name:
-                    name = row_name
+            cols = raw_line.rstrip("\n").split("\t")
+            row_name = cols[name_idx].strip() if name_idx is not None and len(cols) > name_idx else fallback_name
+            pattern_raw = cols[pattern_idx].strip() if pattern_idx is not None and len(cols) > pattern_idx else ""
+            if antenna_name and antenna_name.lower() not in row_name.lower():
+                continue
+            row_freq = None
+            if freq_idx is not None and len(cols) > freq_idx:
+                try:
+                    row_freq = float(cols[freq_idx])
+                except ValueError:
+                    row_freq = None
+            row = {
+                "name": row_name,
+                "gain": None,
+                "pattern": _parse_pattern_string(pattern_raw),
+                "beamwidth": None,
+                "h_bw": None,
+                "v_bw": None,
+                "freq_mhz": row_freq,
+                "ftb": None,
+                "tilt": None,
+            }
             if gain_idx is not None and len(cols) > gain_idx:
                 try:
-                    gain_max = float(cols[gain_idx])
+                    row["gain"] = float(cols[gain_idx])
                 except ValueError:
                     pass
-            # Parse inline horizontal pattern after standard columns
-            pat_start = max(x for x in [name_idx, gain_idx, bw_idx] if x is not None) + 1
-            remaining = cols[pat_start:] if len(cols) > pat_start else []
-            i = 0
-            while i < len(remaining) - 1:
+            if beam_idx is not None and len(cols) > beam_idx:
                 try:
-                    az = int(float(remaining[i])) % 360
-                    gain = float(remaining[i + 1])
-                    h_pattern[az] = gain
-                    i += 2
-                except (ValueError, IndexError):
-                    i += 1
-            break
+                    row["beamwidth"] = float(cols[beam_idx])
+                except ValueError:
+                    pass
+            if h_idx is not None and len(cols) > h_idx:
+                try:
+                    row["h_bw"] = float(cols[h_idx])
+                except ValueError:
+                    pass
+            if v_idx is not None and len(cols) > v_idx:
+                try:
+                    row["v_bw"] = float(cols[v_idx])
+                except ValueError:
+                    pass
+            if ftb_idx is not None and len(cols) > ftb_idx:
+                try:
+                    row["ftb"] = float(cols[ftb_idx])
+                except ValueError:
+                    pass
+            if tilt_idx is not None and len(cols) > tilt_idx:
+                try:
+                    row["tilt"] = float(cols[tilt_idx])
+                except ValueError:
+                    pass
+            rows.append(row)
+
+    if not rows:
+        raise ValueError(f"No antenna rows found in {filepath}")
+
+    if freq_mhz is not None:
+        selected = min(rows, key=lambda row: abs((row["freq_mhz"] or freq_mhz) - freq_mhz))
+    else:
+        selected = rows[0]
+
+    name = selected["name"]
+    gain_max = selected["gain"] or 0.0
+    h_pattern = selected["pattern"]
+    h_bw = selected["h_bw"] or selected["beamwidth"] or 65.0
+    v_bw = selected["v_bw"] or 10.0
+    ftb = selected["ftb"] or 25.0
+    tilt = selected["tilt"] or 0.0
+    resolved_freq = selected["freq_mhz"] or freq_mhz or 3500.0
 
     if h_pattern:
         calc_bw = _calc_beamwidth(h_pattern)
-        if calc_bw < 350:
+        if calc_bw and calc_bw < 350:
             h_bw = calc_bw
         ftb = _calc_front_to_back(h_pattern)
 
     ptype = "omni" if h_bw >= 350 else ("beamforming" if h_bw <= 45 else "custom")
     return AntennaPattern(
-        name=name, pattern_type=ptype, frequency_mhz=freq_mhz,
+        name=name,
+        pattern_type=ptype,
+        frequency_mhz=resolved_freq,
         gain_max_dbi=gain_max,
         horizontal_pattern=h_pattern if h_pattern else _cosine_pattern(h_bw, ftb),
         vertical_pattern=_vertical_pattern(v_bw, tilt),
-        beamwidth_h_deg=h_bw, beamwidth_v_deg=v_bw,
-        front_to_back_db=ftb, tilt_deg=tilt, source="atoll",
+        beamwidth_h_deg=h_bw,
+        beamwidth_v_deg=v_bw,
+        front_to_back_db=ftb,
+        tilt_deg=tilt,
+        source="atoll",
     )
 
 
@@ -901,6 +968,133 @@ CATALOG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "data", "radio_antenna_catalog.json"
 )
+PATTERN_ASSET_ROOTS = [
+    Path(os.path.dirname(CATALOG_PATH)) / "patterns",
+    Path.home() / "Downloads" / "42. Radio and Antenna" / "Antenna Products",
+]
+
+
+def _normalize_pattern_relpath(path_value: str) -> str:
+    return path_value.replace("\\", "/").strip()
+
+
+def _resolve_pattern_asset(path_value: str | None, expect_dir: bool = False) -> Optional[Path]:
+    if not path_value:
+        return None
+    normalized = _normalize_pattern_relpath(path_value)
+    raw_path = Path(normalized)
+    candidate_paths = []
+    if raw_path.is_absolute():
+        candidate_paths.append(raw_path)
+    else:
+        candidate_paths.append(Path(normalized))
+        for root in PATTERN_ASSET_ROOTS:
+            candidate_paths.append(root / normalized)
+            candidate_paths.append(root / Path(normalized).name)
+    for candidate in candidate_paths:
+        if expect_dir and candidate.is_dir():
+            return candidate
+        if not expect_dir and candidate.is_file():
+            return candidate
+    return None
+
+
+def _pick_msi_file(directory: Path, freq_mhz: float | None = None) -> Optional[Path]:
+    files = sorted(p for p in directory.rglob("*") if p.suffix.lower() in {".msi", ".txt"})
+    if not files:
+        return None
+    if freq_mhz is None:
+        return files[0]
+
+    def score(path: Path) -> tuple[float, int, str]:
+        nums = [int(token) for token in ''.join(ch if ch.isdigit() else ' ' for ch in path.stem).split() if token.isdigit()]
+        freq_candidates = [num for num in nums if 500 <= num <= 7000]
+        freq_score = min((abs(num - freq_mhz) for num in freq_candidates), default=10_000.0)
+        ext_priority = 0 if path.suffix.lower() == ".msi" else 1
+        return (freq_score, ext_priority, str(path))
+
+    return min(files, key=score)
+
+
+def _parse_pattern_string(raw: str) -> dict[int, float]:
+    tokens = raw.replace(",", " ").split()
+    if len(tokens) >= 6 and tokens[0] in {"2", "3"} and tokens[3] in {"360", "361"}:
+        tokens = tokens[4:]
+    pattern = {}
+    idx = 0
+    while idx + 1 < len(tokens):
+        try:
+            az = int(float(tokens[idx])) % 360
+            gain = float(tokens[idx + 1])
+            pattern[az] = gain
+            idx += 2
+        except ValueError:
+            idx += 1
+    return pattern
+
+
+def _merge_catalog_pattern(pattern: AntennaPattern, ant: dict, freq_mhz: float | None, gain_dbi: float, h_bw: float, v_bw: float, ftb: float, tilt_deg: float) -> AntennaPattern:
+    merged = AntennaPattern(
+        name=f"{ant['vendor']} {ant['model']}",
+        pattern_type=pattern.pattern_type,
+        frequency_mhz=freq_mhz or pattern.frequency_mhz,
+        gain_max_dbi=gain_dbi if gain_dbi is not None else pattern.gain_max_dbi,
+        horizontal_pattern=pattern.horizontal_pattern or _cosine_pattern(h_bw, ftb),
+        vertical_pattern=pattern.vertical_pattern or _vertical_pattern(v_bw, tilt_deg),
+        beamwidth_h_deg=h_bw or pattern.beamwidth_h_deg,
+        beamwidth_v_deg=v_bw or pattern.beamwidth_v_deg,
+        front_to_back_db=ftb or pattern.front_to_back_db,
+        tilt_deg=tilt_deg,
+        source=f"catalog:{pattern.source}",
+    )
+    if merged.pattern_type == "omni" and merged.beamwidth_h_deg < 359:
+        merged.pattern_type = "custom"
+    return merged
+
+
+def _load_catalog_pattern_asset(ant: dict, freq_mhz: float | None, gain_dbi: float, h_bw: float, v_bw: float, ftb: float, tilt_deg: float) -> Optional[AntennaPattern]:
+    source_type = (ant.get("pattern_source_type") or ant.get("pattern_type") or "").lower()
+    pattern_asset = ant.get("pattern_asset") or ant.get("atoll_file") or ant.get("pattern_file")
+
+    if "atoll" in source_type and pattern_asset:
+        asset = _resolve_pattern_asset(pattern_asset)
+        if asset is not None:
+            pattern = parse_atoll_txt(str(asset), freq_mhz=freq_mhz)
+            return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    if source_type in {"msi", "msi_file"} and pattern_asset:
+        asset = _resolve_pattern_asset(pattern_asset)
+        if asset is not None:
+            pattern = parse_msi_pattern(str(asset))
+            return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    if source_type == "msi_dir" or ant.get("msi_dir"):
+        asset_dir = _resolve_pattern_asset(ant.get("msi_dir") or pattern_asset, expect_dir=True)
+        if asset_dir is not None:
+            asset = _pick_msi_file(asset_dir, freq_mhz=freq_mhz)
+            if asset is not None:
+                pattern = parse_msi_pattern(str(asset))
+                return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    if source_type == "atoll_ant" and pattern_asset:
+        asset = _resolve_pattern_asset(pattern_asset)
+        if asset is not None:
+            pattern = parse_atoll_ant(str(asset))
+            return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    if source_type == "csv" and pattern_asset:
+        asset = _resolve_pattern_asset(pattern_asset)
+        if asset is not None:
+            pattern = parse_csv_pattern(str(asset))
+            return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    if source_type == "json" and pattern_asset:
+        asset = _resolve_pattern_asset(pattern_asset)
+        if asset is not None:
+            pattern = parse_json_pattern(str(asset))
+            return _merge_catalog_pattern(pattern, ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+
+    return None
 
 
 def load_catalog() -> dict:
@@ -971,12 +1165,72 @@ def get_catalog_radio_total_tx_power_w(vendor: str, model: str) -> Optional[floa
     return resolve_catalog_radio_total_tx_power_w(get_catalog_radio(vendor, model))
 
 
+def load_custom_pattern(
+    pattern_file: str,
+    pattern_format: str | None = None,
+    antenna_name: str | None = None,
+    freq_mhz: float | None = None,
+) -> AntennaPattern:
+    asset = _resolve_pattern_asset(pattern_file)
+    if asset is None:
+        raise FileNotFoundError(f"Pattern asset not found: {pattern_file}")
+
+    fmt = (pattern_format or 'auto').lower()
+    if fmt == 'auto':
+        ext = asset.suffix.lower()
+        if ext == '.ant':
+            fmt = 'ant'
+        elif ext == '.csv':
+            fmt = 'csv'
+        elif ext == '.json':
+            fmt = 'json'
+        elif ext == '.msi':
+            fmt = 'msi'
+        elif ext == '.txt':
+            with asset.open(encoding='utf-8', errors='ignore') as f:
+                head = ''.join(f.readline() for _ in range(3)).upper()
+            fmt = 'msi' if 'HORIZONTAL' in head or head.startswith('NAME') else 'atoll_txt'
+        else:
+            raise ValueError(f"Unsupported custom pattern extension: {ext}")
+
+    if fmt == 'ant':
+        pattern = parse_atoll_ant(str(asset))
+    elif fmt == 'csv':
+        pattern = parse_csv_pattern(str(asset))
+    elif fmt == 'json':
+        pattern = parse_json_pattern(str(asset))
+    elif fmt == 'msi':
+        pattern = parse_msi_pattern(str(asset))
+    elif fmt == 'atoll_txt':
+        pattern = parse_atoll_txt(str(asset), antenna_name=antenna_name, freq_mhz=freq_mhz)
+    else:
+        raise ValueError(f"Unsupported custom pattern format: {fmt}")
+
+    pattern.name = antenna_name or pattern.name
+    pattern.frequency_mhz = freq_mhz or pattern.frequency_mhz
+    pattern.source = f"custom:{fmt}"
+    return pattern
+
+
+def resolve_antenna_pattern(base_station, freq_mhz: float | None = None) -> AntennaPattern:
+    if getattr(base_station, 'antenna_pattern_file', None):
+        return load_custom_pattern(
+            base_station.antenna_pattern_file,
+            pattern_format=base_station.antenna_pattern_format,
+            antenna_name=base_station.antenna_pattern_name,
+            freq_mhz=base_station.antenna_pattern_freq_mhz or freq_mhz,
+        )
+    if getattr(base_station, 'antenna_vendor', None) and getattr(base_station, 'antenna_model', None):
+        return antenna_pattern_from_catalog(base_station.antenna_vendor, base_station.antenna_model, freq_mhz=freq_mhz)
+    return pattern_for_config(base_station.antenna_config)
+
+
 def antenna_pattern_from_catalog(vendor: str, model: str, freq_mhz: float = None) -> AntennaPattern:
     """Create AntennaPattern from catalog antenna entry.
 
-    Uses catalog specs (gain, beamwidth, pattern files). If pattern_file
-    is specified, attempts to load it. Otherwise generates cosine pattern.
-    Multi-band antennas select subband by freq_mhz.
+    Prefers a real imported pattern asset when catalog metadata points to one.
+    Falls back to a synthesized cosine/vertical pattern when no asset exists
+    or parsing fails.
     """
     ant = get_catalog_antenna(vendor, model)
     gain_dbi = ant.get("gain_dbi")
@@ -1010,6 +1264,10 @@ def antenna_pattern_from_catalog(vendor: str, model: str, freq_mhz: float = None
     h_bw = h_bw or 65.0
     v_bw = v_bw or 15.0
 
+    loaded = _load_catalog_pattern_asset(ant, freq_mhz, gain_dbi, h_bw, v_bw, ftb, tilt_deg)
+    if loaded is not None:
+        return loaded
+
     # Determine pattern type
     if h_bw <= 45:
         pattern_type = "beamforming"
@@ -1032,7 +1290,7 @@ def antenna_pattern_from_catalog(vendor: str, model: str, freq_mhz: float = None
         beamwidth_v_deg=v_bw,
         front_to_back_db=ftb,
         tilt_deg=tilt_deg,
-        source="catalog",
+        source="catalog:synthetic",
     )
 
 

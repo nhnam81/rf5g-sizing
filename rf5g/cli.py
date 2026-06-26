@@ -21,6 +21,7 @@ from .engine.sinr_mapper import map_sinr_to_cqi, calculate_cell_throughput, cove
 from .engine.capacity import calculate_capacity
 from .engine.qos_verifier import verify_qos
 from .engine.recommender import generate_recommendations
+from .engine.placement_planner import build_placement_plan, effective_planning_area_km2
 from .viz.coverage_map import (
     generate_coverage_map, generate_interactive_map,
     export_sites_json, export_sites_csv, import_sites_json, import_sites_csv,
@@ -35,6 +36,62 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 console = Console()
+
+
+def _resolve_equipment_provenance(inp: RFSizingInput, effective_bs: dict) -> tuple[dict | None, dict | None]:
+    radio_details = None
+    antenna_details = None
+
+    if inp.base_station.radio_vendor and inp.base_station.radio_model:
+        try:
+            from .models.antenna_pattern import get_catalog_radio
+            radio = get_catalog_radio(inp.base_station.radio_vendor, inp.base_station.radio_model)
+            radio_details = {
+                'vendor': radio.get('vendor'),
+                'model': radio.get('model'),
+                'source_pdf': radio.get('source_pdf'),
+                'import_confidence': radio.get('import_confidence'),
+            }
+        except Exception:
+            radio_details = {
+                'vendor': inp.base_station.radio_vendor,
+                'model': inp.base_station.radio_model,
+            }
+
+    if inp.base_station.antenna_pattern_file:
+        antenna_details = {
+            'vendor': inp.base_station.antenna_vendor,
+            'model': inp.base_station.antenna_model,
+            'pattern_source': effective_bs.get('pattern_source'),
+            'pattern_source_type': inp.base_station.antenna_pattern_format or 'auto',
+            'pattern_asset': inp.base_station.antenna_pattern_file,
+        }
+    elif inp.base_station.antenna_vendor and inp.base_station.antenna_model:
+        try:
+            from .models.antenna_pattern import get_catalog_antenna
+            ant = get_catalog_antenna(inp.base_station.antenna_vendor, inp.base_station.antenna_model)
+            antenna_details = {
+                'vendor': ant.get('vendor'),
+                'model': ant.get('model'),
+                'source_pdf': ant.get('source_pdf'),
+                'import_confidence': ant.get('import_confidence'),
+                'pattern_source_type': ant.get('pattern_source_type') or ant.get('pattern_type'),
+                'pattern_asset': ant.get('pattern_asset') or ant.get('atoll_file') or ant.get('pattern_file'),
+                'pattern_source': effective_bs.get('pattern_source'),
+            }
+        except Exception:
+            antenna_details = {
+                'vendor': inp.base_station.antenna_vendor,
+                'model': inp.base_station.antenna_model,
+                'pattern_source': effective_bs.get('pattern_source'),
+            }
+    elif effective_bs.get('pattern_source'):
+        antenna_details = {
+            'pattern_source': effective_bs.get('pattern_source'),
+        }
+
+    return radio_details, antenna_details
+
 
 def _run_sizing(inp: RFSizingInput) -> SizingOutput:
     """Run complete sizing calculation from input."""
@@ -97,13 +154,16 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
         combined_path_loss_db=None if path_type != "combined" else round(pl_at_radius, 2),
     )
 
+    planning_area_km2 = effective_planning_area_km2(inp)
+
     # Site estimation
     site = estimate_sites(
-        area_km2=inp.project.area_km2,
+        area_km2=planning_area_km2,
         cell_radius_km=cell_radius_km,
         sectors=inp.base_station.sectors,
         overlap_factor=inp.margins.overlap_factor,
         limiting_link=limiting_link,
+        antenna_pattern=effective_bs["pattern"],
     )
 
     # SINR at cell edge
@@ -124,8 +184,21 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
     # QoS verification
     qos_results = verify_qos(inp, sinr_db, cell_radius_km, qos_lookup)
 
+    capacity_probe = calculate_capacity(inp, sinr_db, max(1, site.coverage_sites), band_lookup, sinr_lookup, area_km2=planning_area_km2)
+    placement_plan = build_placement_plan(
+        inp,
+        site,
+        effective_bs["pattern"],
+        cell_dl_capacity_mbps=capacity_probe.cell_throughput_dl_mbps,
+        cell_ul_capacity_mbps=capacity_probe.cell_throughput_ul_mbps,
+    )
+    if placement_plan is not None:
+        site.coverage_sites = placement_plan.metrics.selected_sites
+
     # Capacity dimensioning
-    capacity = calculate_capacity(inp, sinr_db, site.coverage_sites, band_lookup, sinr_lookup)
+    capacity = calculate_capacity(inp, sinr_db, site.coverage_sites, band_lookup, sinr_lookup, area_km2=planning_area_km2)
+
+    radio_details, antenna_details = _resolve_equipment_provenance(inp, effective_bs)
 
     # Recommendations
     # Build partial output for recommender
@@ -140,7 +213,11 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
         input_antenna_config=inp.base_station.antenna_config,
         input_tx_power_w=inp.base_station.tx_power_w,
         effective_antenna_gain_dbi=effective_bs["antenna_gain_dbi"],
+        effective_pattern_source=effective_bs.get("pattern_source"),
+        radio_details=radio_details,
+        antenna_details=antenna_details,
         catalog_overrides_applied=effective_bs["catalog_overrides_applied"],
+        placement_plan=placement_plan,
         link_budget_dl=dl_result,
         link_budget_ul=ul_result,
         propagation=prop,
@@ -264,6 +341,45 @@ def size(
         with open(output, "w") as f:
             f.write(result.model_dump_json(indent=2))
         console.print(f"\n[green]Results saved to {output}[/green]")
+
+    return result
+
+@app.command()
+def plan(
+    config: Path = typer.Option(..., "--config", "-c", help="Path to JSON planning config file"),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output JSON file path"),
+):
+    """Run geometry-aware placement planning from a JSON config."""
+    with open(config) as f:
+        data = json.load(f)
+    inp = RFSizingInput(**data)
+    result = _run_sizing(inp)
+    if result.placement_plan is None:
+        raise typer.BadParameter("Config does not include placement.service_area for planning")
+
+    metrics = result.placement_plan.metrics
+    table = Table(title="Placement Plan", show_header=True, header_style="bold")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Mode", result.placement_plan.mode)
+    table.add_row("Service Area", f"{metrics.service_area_km2:.2f} km²")
+    table.add_row("Covered Area", f"{metrics.covered_area_km2:.2f} km²")
+    table.add_row("Coverage Ratio", f"{metrics.coverage_ratio:.1%}")
+    table.add_row("Selected Sites", str(metrics.selected_sites))
+    table.add_row("Locked Sites", str(metrics.locked_sites))
+    table.add_row("Alignment Length", f"{metrics.alignment_length_km:.2f} km")
+    if result.placement_plan.spatial_capacity:
+        sc = result.placement_plan.spatial_capacity
+        table.add_row("Demand DL", f"{sc.demand_dl_gbps:.3f} Gbps")
+        table.add_row("Unserved DL", f"{sc.unserved_dl_gbps:.3f} Gbps")
+        table.add_row("Hotspot Tiles", str(sc.hotspot_tiles))
+        table.add_row("Overloaded Sites", str(sc.overloaded_sites))
+    console.print(table)
+
+    if output:
+        with open(output, "w") as f:
+            f.write(result.model_dump_json(indent=2))
+        console.print(f"[green]Planning results saved to {output}[/green]")
 
     return result
 

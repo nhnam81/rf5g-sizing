@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import os
+from pathlib import Path
 
 # Add project root to path so rf5g package imports work when running standalone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -37,6 +38,7 @@ st.set_page_config(
 
 st.title("📡 5G NR RF Coverage Sizing Tool")
 st.caption("3GPP TR 38.901 | TS 38.104, 38.214, 38.306 | Open-source RF planning")
+st.info("🧭 Với workflow planning nâng cao (service polygon, exclusion zones, alignments, traffic zones, objective mode), nên dùng **Guided Mode**. Compact mode này phù hợp sizing nhanh và expert users.")
 
 # --- Sidebar: Input Parameters ---
 with st.sidebar:
@@ -96,6 +98,20 @@ with st.sidebar:
         _ant_match = next(a for a in _catalog["antennas"] if f"{a['vendor']} {a['model']}" == _ant_sel)
         st.caption(f"{_ant_match['description']} — {_ant_match.get('gain_dbi', '?')} dBi, {_ant_match.get('h_beamwidth_deg', '?')}° azimuth")
 
+    st.caption("Advanced: có thể upload custom antenna pattern để override catalog/built-in pattern cho map/planning.")
+    _custom_pattern_upload = st.file_uploader("Custom pattern", type=["ant", "csv", "json", "msi", "txt"], key="compact_custom_pattern")
+    _custom_pattern_format = st.selectbox("Pattern format", ["auto", "ant", "csv", "json", "msi", "atoll_txt"], index=0)
+    _custom_pattern_name = st.text_input("Pattern row/name (optional)", value="")
+    _custom_pattern_freq_mhz = st.number_input("Pattern frequency hint (MHz)", min_value=0.0, value=0.0, step=10.0)
+    _custom_pattern_file = None
+    if _custom_pattern_upload is not None:
+        upload_dir = Path('/Users/namnguyen/rf5g-sizing/.tmp_import/custom_patterns')
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        upload_path = upload_dir / _custom_pattern_upload.name
+        upload_path.write_bytes(_custom_pattern_upload.getvalue())
+        _custom_pattern_file = str(upload_path)
+        st.caption(f"Using custom pattern: {upload_path.name}")
+
     tx_power_w = st.number_input("TX Power (W)", min_value=1.0, value=float(_radio_total_tx_power_w) if _radio_sel and _radio_total_tx_power_w is not None else 200.0, step=10.0,
         help="Tổng công suất phát mỗi sector/radio (Watt), cộng trên tất cả TX ports — tự động điền từ catalog Radio nếu chọn")
     bs_height_m = st.number_input("BS Height (m)", min_value=5.0, value=25.0, step=1.0,
@@ -152,6 +168,7 @@ with st.sidebar:
 
     # Load config file
     st.subheader("📁 Load Config")
+    st.caption("Tip: config có `placement` / `spatial_capacity` sẽ được backend hiểu, nhưng Guided Mode hiển thị planning workflow tốt hơn.")
     uploaded = st.file_uploader("Upload JSON config", type=["json"])
     if uploaded:
         try:
@@ -188,6 +205,25 @@ def build_input() -> RFSizingInput:
         _antenna_vendor = _am["vendor"]
         _antenna_model = _am["model"]
 
+    base_station = BaseStationConfig(
+            antenna_config=antenna_config,
+            radio_vendor=_radio_vendor,
+            radio_model=_radio_model,
+            antenna_vendor=_antenna_vendor,
+            antenna_model=_antenna_model,
+            tx_power_w=tx_power_w,
+            height_m=bs_height_m,
+            sectors=sectors,
+            cable_loss_db=1.0,
+            noise_figure_db=3.5,
+        )
+    if _custom_pattern_file:
+        base_station.antenna_pattern_source = 'file'
+        base_station.antenna_pattern_file = _custom_pattern_file
+        base_station.antenna_pattern_format = None if _custom_pattern_format == 'auto' else _custom_pattern_format
+        base_station.antenna_pattern_name = _custom_pattern_name or None
+        base_station.antenna_pattern_freq_mhz = _custom_pattern_freq_mhz or None
+
     return RFSizingInput(
         project=ProjectConfig(
             name=project_name,
@@ -200,18 +236,7 @@ def build_input() -> RFSizingInput:
             obstacle_density=obstacle_density,
             coverage_probability=coverage_prob,
         ),
-        base_station=BaseStationConfig(
-            antenna_config=antenna_config,
-            radio_vendor=_radio_vendor,
-            radio_model=_radio_model,
-            antenna_vendor=_antenna_vendor,
-            antenna_model=_antenna_model,
-            tx_power_w=tx_power_w,
-            height_m=bs_height_m,
-            sectors=sectors,
-            cable_loss_db=1.0,
-            noise_figure_db=3.5,
-        ),
+        base_station=base_station,
         frequency=FrequencyConfig(
             band=band,
             bandwidth_mhz=bandwidth_mhz,
@@ -283,6 +308,16 @@ with tab_overview:
     st.subheader("📋 Summary")
     st.write(f"**Project:** {result.project_name} | **Scenario:** {result.environment} | **Band:** {result.band} {result.bandwidth_mhz:.0f}MHz")
     st.write(f"**TX Power:** {result.tx_power_w}W | **Antenna:** {result.antenna_config} | **Propagation:** {result.propagation.model}")
+    radio_details = getattr(result, 'radio_details', None)
+    antenna_details = getattr(result, 'antenna_details', None)
+    if radio_details:
+        st.caption(f"Radio source: {radio_details.vendor or 'unknown'} {radio_details.model or ''}{' — ' + radio_details.source_pdf if radio_details.source_pdf else ''}")
+    if antenna_details:
+        st.caption(f"Antenna source: {antenna_details.vendor or 'custom'} {antenna_details.model or ''}{' — ' + antenna_details.source_pdf if antenna_details.source_pdf else ''}")
+        if antenna_details.pattern_asset:
+            st.caption(f"Pattern asset: {antenna_details.pattern_asset}")
+    if getattr(result, 'effective_pattern_source', None):
+        st.caption(f"Pattern source: {result.effective_pattern_source}")
 
     # JSON export
     col_dl, col_rpt = st.columns(2)

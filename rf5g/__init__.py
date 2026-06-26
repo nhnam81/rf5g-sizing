@@ -1,2 +1,2 @@
 """5G NR RF Coverage Sizing Tool — rf5g."""
-__version__ = "1.3.1"
+__version__ = "1.4.0"
