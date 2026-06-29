@@ -52,11 +52,26 @@ if not exist "%PYTHON_DIR%\Scripts\pip.exe" (
     echo [2/4] pip already installed, skipping.
 )
 
+echo Verifying embedded Python runtime...
+"%PYTHON_DIR%\python.exe" -c "import sys; print(sys.version); raise SystemExit(0 if sys.version_info[:2] == (3, 12) else 1)"
+if errorlevel 1 (
+    echo [ERROR] Embedded Python must be version 3.12.x for this installer build.
+    exit /b 1
+)
+
 :: ── Step 3: Pre-install packages into embedded Python ──
 echo [3/4] Pre-installing rf5g-sizing dependencies...
 "%PYTHON_DIR%\Scripts\pip.exe" install --no-warn-script-location -r "%BUILDER_DIR%\requirements.txt"
 if errorlevel 1 (
     echo [ERROR] Failed to install dependencies.
+    exit /b 1
+)
+
+echo Verifying streamlit-folium frontend assets...
+"%PYTHON_DIR%\python.exe" -c "import os, streamlit_folium; print(getattr(streamlit_folium, '__version__', 'unknown')); p=os.path.join(os.path.dirname(streamlit_folium.__file__),'frontend','build'); print(p); raise SystemExit(0 if os.path.isdir(p) else 1)"
+if errorlevel 1 (
+    echo [ERROR] streamlit-folium frontend/build is missing.
+    echo [ERROR] Reinstall streamlit-folium in the embedded Python and confirm the frontend/build directory exists before compiling the installer.
     exit /b 1
 )
 

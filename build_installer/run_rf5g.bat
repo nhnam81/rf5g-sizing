@@ -27,7 +27,7 @@ echo.
 :: Open browser after 3-second delay (gives Streamlit time to start)
 start "" cmd /c "timeout /t 3 /nobreak >nul & start http://localhost:%PORT%"
 
-"%PYTHON_EXE%" -m streamlit run "%APP_DIR%\rf5g\web\app.py" --server.port %PORT% --server.headless true --browser.gatherUsageStats false --global.developmentMode false
+"%PYTHON_EXE%" -m streamlit run "%APP_DIR%\rf5g\web\guided.py" --server.port %PORT% --server.headless true --browser.gatherUsageStats false --global.developmentMode false
 
 echo.
 echo rf5g-sizing has stopped.

@@ -4,7 +4,8 @@ rich>=13.0
 numpy>=1.24
 scipy>=1.11
 pyyaml>=6.0
-streamlit>=1.25
+streamlit==1.58.0
 folium>=0.14
 matplotlib>=3.7
-jinja2>=3.1streamlit-folium>=0.20
+jinja2>=3.1
+streamlit-folium==0.27.2

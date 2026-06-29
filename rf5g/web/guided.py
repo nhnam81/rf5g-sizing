@@ -6,7 +6,12 @@ import sys
 import os
 import tempfile
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add both the package parent (for `from rf5g...` imports) and the package dir itself
+_app_dir = os.path.dirname(os.path.abspath(__file__))  # rf5g/web
+_pkg_dir = os.path.dirname(_app_dir)  # rf5g
+_project_dir = os.path.dirname(_pkg_dir)  # project root (parent of rf5g)
+sys.path.insert(0, _project_dir)
+sys.path.insert(0, _pkg_dir)
 
 import streamlit as st
 from rf5g.models.input_schema import (
@@ -1412,20 +1417,27 @@ with tab_map:
     with exp_col1:
         if st.button("📥 Export Sites JSON", key="export_json"):
             export_sites = custom_sites if custom_sites else generate_hex_grid(center_lat, center_lon, isd_km, n_total)
-            out_path = export_sites_json(export_sites, f"{result.project_name}_sites.json", metadata={
-                "band": result.band,
-                "isd_km": isd_km,
-                "cell_radius_km": result.propagation.cell_radius_km,
-                "total_sites": len(export_sites),
-            })
-            with open(out_path, encoding="utf-8") as f:
-                st.download_button("⬇️ Download JSON", f.read(), file_name=out_path, mime="application/json")
+            out_path = export_sites_json(
+                export_sites, isd_km, project_name=result.project_name)
+            # Merge metadata into the exported JSON
+            import json as _json
+            data = _json.loads(out_path) if isinstance(out_path, str) else out_path
+            if isinstance(data, dict):
+                data["metadata"] = {
+                    "band": result.band,
+                    "isd_km": isd_km,
+                    "cell_radius_km": result.propagation.cell_radius_km,
+                    "total_sites": len(export_sites),
+                }
+            json_str = _json.dumps(data, indent=2, ensure_ascii=False)
+            st.download_button("⬇️ Download JSON", json_str,
+                file_name=f"{result.project_name}_sites.json", mime="application/json")
     with exp_col2:
         if st.button("📥 Export Sites CSV", key="export_csv"):
             export_sites = custom_sites if custom_sites else generate_hex_grid(center_lat, center_lon, isd_km, n_total)
-            out_path = export_sites_csv(export_sites, f"{result.project_name}_sites.csv")
-            with open(out_path, encoding="utf-8") as f:
-                st.download_button("⬇️ Download CSV", f.read(), file_name=out_path, mime="text/csv")
+            csv_str = export_sites_csv(export_sites, isd_km, project_name=result.project_name)
+            st.download_button("⬇️ Download CSV", csv_str,
+                file_name=f"{result.project_name}_sites.csv", mime="text/csv")
 
 with tab_chart:
     st.markdown("### Charts — Biểu đồ")
