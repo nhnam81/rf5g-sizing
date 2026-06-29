@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rf5g"
-version = "1.4.0"
+version = "1.4.1"
 description = "5G NR RF Coverage Sizing Tool — 3GPP TR 38.901 propagation models, link budget, site estimation, QoS verification"
 readme = "README.md"
 license = {text = "MIT"}
