@@ -118,6 +118,7 @@ class BaseStationConfig(BaseModel):
     sectors: Literal[1, 3, 6] = 3
     cable_loss_db: float = Field(1.0, ge=0, description="Feeder/cable loss in dB")
     noise_figure_db: float = Field(3.5, ge=0, description="BS receiver noise figure in dB")
+    mimo_layers: Optional[int] = Field(None, ge=1, le=16, description="MIMO layers for throughput (None=auto from antenna config, 2T2R=2, 4T4R=2-4, 8T8R+=4)")
 
 
 class FrequencyConfig(BaseModel):
@@ -140,7 +141,9 @@ class MarginsConfig(BaseModel):
     interference_db: float = Field(3.0, ge=0, description="Interference margin in dB")
     shadow_fading_db: Optional[float] = Field(None, ge=0, description="Shadow fading margin (auto if None)")
     rain_attenuation_db: float = Field(1.0, ge=0, description="Rain attenuation in dB")
-    penetration_db: float = Field(10.0, ge=0, description="Building penetration loss in dB")
+    penetration_db: Optional[float] = Field(None, ge=0, description="Building penetration loss in dB (auto-calculated from 3GPP if None)")
+    penetration_type: Optional[Literal["low", "high", "weighted"]] = Field(None, description="O2I loss type: low=residential, high=commercial, weighted=mixed (auto if None)")
+    building_ratio: Optional[float] = Field(None, ge=0, le=1, description="For weighted: ratio of high-loss buildings (auto from scenario if None)")
     vegetation_db: float = Field(0.0, ge=0, description="Vegetation loss in dB")
     overlap_factor: float = Field(0.25, ge=0, le=0.5, description="Cell overlap factor")
 

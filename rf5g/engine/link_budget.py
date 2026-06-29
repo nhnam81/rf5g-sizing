@@ -1,10 +1,11 @@
 """Link budget calculator — DL and UL for 5G NR."""
 from __future__ import annotations
 import math
-from typing import Tuple
+from typing import Tuple, Optional
 from ..models.input_schema import RFSizingInput
 from ..models.lookup_tables import BandLookup, PowerClassLookup, AntennaConfigLookup, ShadowFadingLookup
 from ..models.output_schema import LinkBudgetResult
+from ..models.o2i_penetration import calculate_o2i_loss, get_o2i_type_for_scenario
 
 
 def _resolve_catalog_params(inp: RFSizingInput) -> dict:
@@ -138,6 +139,25 @@ def calculate_link_budget(
             los_condition="NLOS",  # Conservative: use NLOS sigma
         )
 
+    # O2I penetration loss (3GPP TR 38.901 Table 7.4.3-1)
+    # If penetration_db is None, auto-calculate from frequency and scenario
+    penetration_db = inp.margins.penetration_db
+    if penetration_db is None:
+        # Auto-calculate O2I loss based on frequency and scenario
+        loss_type = inp.margins.penetration_type
+        building_ratio = inp.margins.building_ratio
+
+        if loss_type is None or building_ratio is None:
+            # Auto-determine from scenario
+            auto_type, auto_ratio = get_o2i_type_for_scenario(
+                inp.environment.scenario,
+                inp.environment.obstacle_density
+            )
+            loss_type = loss_type or auto_type
+            building_ratio = building_ratio if building_ratio is not None else auto_ratio
+
+        penetration_db = calculate_o2i_loss(fc_mhz, loss_type, building_ratio)
+
     # ---- DOWNLINK ----
     dl_tx_power_dbm = 10 * math.log10(tx_power_w * 1000)  # W to dBm
     dl_tx_gain_db = bs_config["antenna_gain_dbi"] + bs_config["beamforming_gain_db"]
@@ -166,7 +186,7 @@ def calculate_link_budget(
                - inp.margins.interference_db
                - sf_margin
                - inp.margins.rain_attenuation_db
-               - inp.margins.penetration_db)
+               - penetration_db)
 
     dl = LinkBudgetResult(
         direction="DL",
@@ -181,7 +201,7 @@ def calculate_link_budget(
         interference_margin_db=round(inp.margins.interference_db, 2),
         shadow_fading_margin_db=round(sf_margin, 2),
         rain_margin_db=round(inp.margins.rain_attenuation_db, 2),
-        penetration_loss_db=round(inp.margins.penetration_db, 2),
+        penetration_loss_db=round(penetration_db, 2),
         noise_floor_dbm=round(dl_noise_floor_dbm, 2),
         noise_figure_db=round(dl_nf_db, 2),
         snr_required_db=round(dl_snr_required_db, 2),
@@ -211,7 +231,7 @@ def calculate_link_budget(
                - inp.margins.interference_db
                - sf_margin
                - inp.margins.rain_attenuation_db
-               - inp.margins.penetration_db)
+               - penetration_db)
 
     ul = LinkBudgetResult(
         direction="UL",
@@ -226,7 +246,7 @@ def calculate_link_budget(
         interference_margin_db=round(inp.margins.interference_db, 2),
         shadow_fading_margin_db=round(sf_margin, 2),
         rain_margin_db=round(inp.margins.rain_attenuation_db, 2),
-        penetration_loss_db=round(inp.margins.penetration_db, 2),
+        penetration_loss_db=round(penetration_db, 2),
         noise_floor_dbm=round(ul_noise_floor_dbm, 2),
         noise_figure_db=round(ul_nf_db, 2),
         snr_required_db=round(ul_snr_required_db, 2),

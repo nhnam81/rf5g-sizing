@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
+# Import version from package
+from .. import __version__
+
 from ..models.input_schema import RFSizingInput, ProjectConfig, EnvironmentConfig, BaseStationConfig, FrequencyConfig, UEConfig, MarginsConfig, QoSConfig
 from ..models.output_schema import SizingOutput
 from ..models.lookup_tables import BandLookup, AntennaConfigLookup, SINRCQILookup, QoSLookup, ShadowFadingLookup, PowerClassLookup
@@ -33,7 +36,7 @@ from ..engine.placement_planner import effective_planning_area_km2
 app = FastAPI(
     title="5G NR RF Coverage Sizing Tool",
     description="API for 5G NR RF coverage sizing — 3GPP TR 38.901",
-    version="1.4.0",
+    version=__version__,
 )
 
 # CORS for Streamlit frontend
@@ -77,7 +80,7 @@ async def root():
     """API info."""
     return {
         "name": "5G NR RF Coverage Sizing Tool",
-        "version": "1.4.0",
+        "version": __version__,
         "docs": "/docs",
         "endpoints": ["/size", "/placement/plan", "/geometry/validate", "/compare", "/map", "/report", "/charts", "/tables"],
     }

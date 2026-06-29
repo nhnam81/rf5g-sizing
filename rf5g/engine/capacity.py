@@ -37,8 +37,8 @@ def calculate_capacity(
     nrb = band_lookup.get_nrb(inp.frequency.bandwidth_mhz, inp.frequency.scs_khz)
     tdd_dl_ratio = inp.frequency.tdd_dl_ratio
 
-    # Determine MIMO layers from antenna config
-    layers = _get_layers(inp.base_station.antenna_config)
+    # Determine MIMO layers from antenna config or user override
+    layers = _get_layers(inp.base_station.antenna_config, inp.base_station.mimo_layers)
 
     # Map SINR to SE
     cqi_entry = map_sinr_to_cqi(sinr_db, sinr_lookup)
@@ -116,11 +116,37 @@ def calculate_capacity(
     )
 
 
-def _get_layers(antenna_config: str) -> int:
-    """Map antenna config to MIMO layers."""
+def _get_layers(antenna_config: str, mimo_layers_override: int | None = None) -> int:
+    """Map antenna config to MIMO layers.
+
+    Args:
+        antenna_config: Antenna configuration string (e.g., "4T4R", "32T32R")
+        mimo_layers_override: User-specified MIMO layers (None = auto)
+
+    Returns:
+        Number of MIMO layers for throughput calculation
+
+    Note:
+        3GPP TS 38.211/38.212 typical values:
+        - 2T2R: 2 layers (SU-MIMO)
+        - 4T4R: 2-4 layers (2 conservative SU-MIMO, 4 optimistic MU-MIMO)
+        - 8T8R+: 4-8 layers (MU-MIMO)
+
+        Default uses conservative values:
+        - 2T2R: 2 layers
+        - 4T4R: 2 layers (conservative SU-MIMO)
+        - 8T8R+: 4 layers (MU-MIMO)
+    """
+    # If user specifies override, use it
+    if mimo_layers_override is not None:
+        return mimo_layers_override
+
+    # Conservative default mapping
+    # Note: 4T4R defaults to 2 layers (SU-MIMO conservative)
+    # Real-world 4T4R can achieve 2-4 DL layers in ideal conditions
     config_map = {
         "2T2R": 2,
-        "4T4R": 4,
+        "4T4R": 2,   # Conservative: SU-MIMO typical
         "8T8R": 4,
         "16T16R": 4,
         "32T32R": 4,

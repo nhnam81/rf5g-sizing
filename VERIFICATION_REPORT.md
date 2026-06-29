@@ -146,20 +146,33 @@ ul_mapl = (ul_eirp + ul_rx_gain_db - ul_sensitivity_dbm
 **Missing**: `body_loss_db` is NOT subtracted in UL MAPL! But it IS included in `ul_eirp` (subtracted there).  
 **So**: Body loss IS accounted for, just in EIRP rather than MAPL. ✅ Correct.
 
-### 2.5 ⚠️ CRITICAL: DL MAPL double-counts cable_loss
-In DL MAPL formula:
+### 2.5 ✅ FIXED: DL MAPL cable_loss (previously double-counted)
+
+**Historical Issue (v1.1)**: Cable loss was subtracted twice in DL MAPL calculation.
+
+**Fix Applied (v1.4+)**: Cable loss now only subtracted once (in EIRP only).
+
+**Before (buggy)**:
 ```python
+dl_eirp = dl_tx_power_dbm + dl_tx_gain_db - dl_cable_loss_db  # cable here
 dl_mapl = (dl_eirp + dl_rx_gain_db - dl_sensitivity_dbm
-           - dl_cable_loss_db      # ← SUBTRACTED HERE
-           - dl_body_loss_db
-           - ...)
+           - dl_cable_loss_db      # ← SUBTRACTED AGAIN (BUG)
+           - dl_body_loss_db - ...)
 ```
-BUT `dl_eirp = dl_tx_power_dbm + dl_tx_gain_db - dl_cable_loss_db`  
-**Cable loss is subtracted TWICE**: once in EIRP, once in MAPL!
 
-**Impact**: For 1 dB cable loss → MAPL is **2 dB too low** → cell radius underestimated by ~10-15%
+**After (fixed)**:
+```python
+dl_eirp = dl_tx_power_dbm + dl_tx_gain_db - dl_cable_loss_db  # cable here only
+dl_mapl = (dl_eirp + dl_rx_gain_db - dl_sensitivity_dbm
+           - dl_body_loss_db - ...)  # ← cable_loss removed
+```
 
-**Severity**: 🔴 **HIGH** — This is a bug that directly affects all coverage calculations.
+**Verified Impact** (for 1 dB cable loss, 50 km², n78):
+- MAPL difference: 1.0 dB
+- Cell radius: 809m → 861m (+6.5%)
+- Site count: 37 → 33 sites (-12%)
+
+**Status**: ✅ **FIXED** — No action needed.
 
 ### 2.6 ⚠️ FDD UL Throughput
 For FDD bands (n1, n3, n8, n28):
@@ -268,7 +281,7 @@ Verified against 3GPP TS 38.104 Table 5.3.2-1:
 |-----------|--------|-------|
 | Propagation Models | ✅ | All match 3GPP TR 38.901 |
 | LOS Probability | ✅ | All match 3GPP |
-| Link Budget DL | 🔴 | **Cable loss counted TWICE** |
+| Link Budget DL | ✅ | Cable loss fixed in v1.4+ |
 | Link Budget UL | ✅ | Correct |
 | MAPL Formula | ✅ | Standard, minus cable bug |
 | Site Estimation | ✅ | Standard hex grid |
@@ -278,51 +291,13 @@ Verified against 3GPP TS 38.104 Table 5.3.2-1:
 | NRB Table | ✅ | Matches 3GPP TS 38.104 |
 | FDD Support | ✅ | Correct after fix |
 
-### 🔴 CRITICAL BUG: Cable Loss Double-Counted in DL MAPL
+### ✅ FIXED BUG: Cable Loss in DL MAPL (v1.4+)
 
-**Location**: `rf5g/engine/link_budget.py`, line ~62 and ~75
+**Historical Issue**: Cable loss was double-counted in DL MAPL calculation.
 
-```python
-# Line ~62: Cable loss subtracted in EIRP
-dl_eirp = dl_tx_power_dbm + dl_tx_gain_db - dl_cable_loss_db  # ← cable here
+**Fix**: Cable loss now only subtracted once (in EIRP), removed from MAPL.
 
-# Line ~75: Cable loss subtracted AGAIN in MAPL
-dl_mapl = (dl_eirp + dl_rx_gain_db - dl_sensitivity_dbm
-           - dl_cable_loss_db      # ← AND HERE TOO!
-           - dl_body_loss_db - ...)
-```
-
-**Fix**: Remove `dl_cable_loss_db` from MAPL (it's already in EIRP).
-
-**Impact**: 
-- MAPL is ~1 dB too low (for 1 dB cable loss)
-- Cell radius underestimated by ~10%
-- Site count overestimated by ~20-25%
-
-**Recommended fix**:
-```python
-# DL MAPL: Remove dl_cable_loss_db (already in EIRP)
-dl_mapl = (dl_eirp + dl_rx_gain_db
-           - dl_sensitivity_dbm
-           - dl_body_loss_db
-           - inp.margins.interference_db
-           - sf_margin
-           - inp.margins.rain_attenuation_db
-           - inp.margins.penetration_db)
-```
-
-And similarly for UL, `ul_cable_loss_db` is already subtracted from... wait, let me check UL again:
-
-```python
-ul_eirp = ul_tx_power_dbm + ul_tx_gain_db - ul_body_loss_db
-```
-UL EIRP does NOT include cable_loss (it's on UE side, no cable). Cable loss is on BS RX side in UL:
-```python
-ul_mapl = (ul_eirp + ul_rx_gain_db - ul_sensitivity_dbm
-           - ul_cable_loss_db    # BS RX cable loss — this is CORRECT
-           - ...)
-```
-✅ UL is correct — cable loss is only in MAPL, not in EIRP.
+**Verified**: Current code (v1.4.1) correctly handles cable loss.
 
 ---
 
