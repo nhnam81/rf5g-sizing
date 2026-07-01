@@ -2,9 +2,40 @@
 
 3GPP TR 38.901 propagation models, link budget analysis, site estimation, and QoS verification for 5G NR network planning.
 
-## Quick Start (Windows)
+## Quick Start
 
-1. Double-click `rf5g-sizing-1.4.0-setup.exe`
+### Two Workflows
+
+| Workflow | Use Case | Time |
+|----------|----------|------|
+| **Quick Sizing** | "How many sites do I need?" | ~1 min |
+| **Planning** | "Where should I put my sites?" | ~5 min |
+
+### Quick Sizing (Recommended First Step)
+
+**UI:** Open http://localhost:8501 → Select preset → Calculate
+
+**CLI:**
+```bash
+rf5g size --area 50 --scenario UMa --band n78 --power 200
+```
+
+### Planning (Geometry-Aware Site Placement)
+
+**Prerequisites:** Complete sizing first
+
+**CLI:**
+```bash
+rf5g plan --config planning_config.json
+```
+
+📖 **See [WORKFLOW.md](WORKFLOW.md) for complete workflow documentation.**
+
+---
+
+## Quick Start (Windows Installer)
+
+1. Double-click `rf5g-sizing-1.4.1-setup.exe`
 2. Follow the installer wizard
 3. Launch from Desktop shortcut or Start Menu
 4. Browser opens automatically at `http://localhost:8501`
@@ -27,6 +58,7 @@
 
 ## Documentation
 
+- [**WORKFLOW.md**](WORKFLOW.md) — Canonical user workflow (Quick Sizing vs Planning)
 - [Install Guide](INSTALL_GUIDE.md) — Detailed installation instructions
 - [User Guide](USER_GUIDE.md) — How to use the tool
 - [ROADMAP.md](ROADMAP.md) — Milestone direction and sequencing

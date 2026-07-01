@@ -4,182 +4,295 @@
 
 rf5g-sizing is a 5G NR RF Coverage Sizing Tool based on 3GPP standards. It helps radio planners estimate the number of base stations needed, verify QoS targets, and generate coverage maps.
 
-**Standards referenced:**
-- 3GPP TR 38.901 — Propagation models
-- 3GPP TS 38.104 — Base station RF requirements
-- 3GPP TS 38.214 — Physical layer measurements
-- 3GPP TS 38.306 — UE capabilities
+**Two Workflows:**
 
-## Getting Started
+| Workflow | Purpose | Complexity | Time |
+|----------|---------|------------|------|
+| **Quick Sizing** | Estimate site count and coverage | Simple | ~1 min |
+| **Planning** | Geometry-aware site placement | Advanced | ~5 min |
 
-1. Launch rf5g-sizing (Desktop shortcut or Start Menu)
+> 💡 **Recommendation:** Start with Quick Sizing. Use Planning when you need actual site positions.
+
+---
+
+## Quick Sizing Workflow
+
+### Step 1: Launch
+
+1. Start rf5g-sizing (Desktop shortcut or `streamlit run rf5g/web/guided.py`)
 2. Browser opens at `http://localhost:8501`
-3. Configure parameters in the sidebar
-4. Click **🚀 Calculate**
-5. Review results in the main panel
 
-## Interface Guide
+### Step 2: Choose Starting Point
 
-### Sidebar — Input Parameters
+**Option A: Select a Preset (Recommended)**
 
-#### 📍 Project
-- **Project Name**: Label for your project
-- **Coverage Area (km²)**: Total area to cover
-- **Center Latitude/Longitude**: Center point for coverage map
+Choose from curated scenarios:
+- 🏙️ **Dense Urban n78** — High-density urban, 3.5 GHz
+- 🏘️ **Suburban n77** — Suburban residential, 3.3 GHz
+- 🌾 **Rural n8** — Rural wide-area, 900 MHz
 
-#### 🏙️ Environment
-- **Scenario**: 
-  - `UMa` — Urban Macro (outdoor, high BS)
-  - `UMi` — Urban Micro (outdoor, low BS)
-  - `RMa` — Rural Macro
-  - `InH` — Indoor Hotspot
-- **Obstacle Density**: heavy / medium / light — affects penetration loss
-- **Coverage Probability**: Target probability (0.80–0.99)
+**Option B: Load Config File**
 
-#### 📡 Base Station
-- **Antenna Config**: 32T32R, 64T64R, 8T8R, 4T4R, 2T2R
-- **TX Power (W)**: Base station transmit power
-- **BS Height (m)**: Antenna height above ground
-- **Sectors**: 1 (omni), 3 (standard), or 6 (high capacity)
+Click **📁 Load Config** to restore a saved JSON configuration.
 
-#### 📻 Frequency
-- **NR Band**: n78 (3.5 GHz), n77 (3.3–4.2 GHz), n41 (2.5 GHz), n1/n3/n8/n28/n25/n71
-- **Bandwidth (MHz)**: Channel bandwidth (5–100 MHz)
-- **SCS (kHz)**: Subcarrier spacing — 15/30/60/120 kHz
-- **TDD DL Ratio**: Downlink ratio in TDD config (0.5–0.9)
+**Option C: Manual Input**
 
-#### 📱 UE (User Equipment)
-- **Power Class**: PC1–PC4 (PC3 = typical smartphone)
-- **UE Height (m)**: Usually 1.5m
-- **UE Noise Figure (dB)**: Receiver noise figure
+Enter parameters directly (see Parameter Reference below).
 
-#### 📊 Margins
-- **Interference Margin (dB)**: Uplink interference margin
-- **Penetration Loss (dB)**: Indoor penetration loss
-- **Rain Attenuation (dB)**: Rain margin
-- **Overlap Factor**: Cell overlap factor (0–0.5)
+### Step 3: Adjust Parameters (Optional)
 
-#### 🎯 QoS
-- **Primary Service**: mixed, vonr, video_hd, video_4k, data, gaming, iot
-- **Users per km²**: User density
-- **DL/UL per User (Mbps)**: Per-user throughput requirement
-- **Concurrent Ratio**: Fraction of active users
+Modify key parameters in the expandable sections:
 
-### Main Panel — Results
+| Parameter | Typical Range | Impact |
+|-----------|---------------|--------|
+| Coverage Area | 1–1000 km² | Site count scales linearly |
+| Scenario | UMa/UMi/RMa/InH | Propagation model |
+| Band | n78, n77, n41, n8 | Frequency, coverage |
+| TX Power | 40–320 W | Cell radius |
+| Penetration Loss | 5–20 dB | Indoor coverage depth |
 
-After clicking **Calculate**, you'll see:
+### Step 4: Calculate
 
-1. **Link Budget Table** — Detailed DL/UL path budget
-2. **Site Count** — Number of sites needed for coverage
-3. **SINR Heatmap** — Signal quality distribution
-4. **Service Zones** — Coverage by service type
-5. **Coverage Map** — Interactive Folium map with hex grid
-6. **Capacity Analysis** — Throughput vs demand
+Click **🚀 Tính toán** (Calculate)
 
-### Guided Mode
+### Step 5: Review Results
 
-Switch to **Guided Mode** using the sidebar toggle for step-by-step explanations of each parameter.
+**Key Metrics:**
+- **Cell Radius** — Coverage range per site
+- **Coverage Sites** — Sites needed for coverage
+- **Limiting Link** — UL or DL bottleneck
+- **Cell Edge SINR** — Signal quality at cell edge
+- **Capacity** — Supply vs demand
 
-### Export Results
+**Warnings** appear for:
+- Extreme parameter combinations
+- Approximation-sensitive scenarios
+- Equipment mismatches
 
-- **📊 Export Report** — Download HTML or Markdown report
-- **🗺️ Export Map** — Download interactive coverage map (HTML)
-- **📋 Export Sites** — Download site list (CSV/JSON)
+### Step 6: Export (Optional)
 
-## Configuration Files
+| Export | Format | Use Case |
+|--------|--------|----------|
+| 📊 Report | HTML, MD | Documentation, sharing |
+| 🗺️ Map | HTML | Coverage visualization |
+| 📋 Sites | JSON, CSV | Site list for planning tools |
 
-You can save and load configurations as JSON:
+---
 
-1. Configure all parameters in the sidebar
-2. Click **💾 Save Config** to download JSON
-3. Later, use **📁 Load Config** to restore
+## Planning Workflow
 
-Example config:
+Planning adds geometry-aware site placement on top of Quick Sizing.
+
+### Prerequisites
+
+Complete Quick Sizing first (Steps 1–5) to establish baseline coverage parameters.
+
+### Step 1: Enable Planning Mode
+
+In the UI, select **"Geometry-aware planning"** in the Planning section.
+
+### Step 2: Define Service Area
+
+Provide a polygon defining the area to cover:
+
 ```json
 {
-  "project": {"name": "Dense Urban n78", "area_km2": 50, "center_lat": 10.78, "center_lon": 106.70},
-  "environment": {"scenario": "UMa", "obstacle_density": "heavy", "coverage_prob": 0.95},
-  "base_station": {"antenna_config": "32T32R", "tx_power_w": 200, "bs_height_m": 25, "sectors": 3},
-  "frequency": {"band": "n78", "bandwidth_mhz": 100, "scs_khz": 30, "tdd_dl_ratio": 0.70},
-  "ue": {"power_class": "PC3", "ue_height_m": 1.5, "ue_noise_figure": 7.0},
-  "margins": {"interference_db": 3.0, "penetration_db": 10.0, "rain_db": 1.0, "overlap_factor": 0.25},
-  "qos": {"primary_service": "mixed", "users_per_km2": 300, "dl_per_user_mbps": 20, "ul_per_user_mbps": 5, "concurrent_ratio": 0.10}
+  "coordinates": [
+    [106.70, 10.75],
+    [106.75, 10.75],
+    [106.75, 10.80],
+    [106.70, 10.80],
+    [106.70, 10.75]
+  ]
 }
 ```
 
-## CLI Mode (Advanced)
+### Step 3: Add Constraints (Optional)
 
-For automation and scripting, use the `rf5g` CLI:
+**Exclusion Zones** — Areas where sites cannot be placed:
+- Water bodies
+- Protected areas
+- Existing buildings
 
-### Calculate Sizing
+**Alignment Corridors** — Linear features for site placement:
+- Roads
+- Railways
+- Utility corridors
 
-```cmd
-rf5g size --config my_config.json --output results.json
+**Locked Sites** — Existing sites to preserve:
+- Current cell towers
+- Planned site locations
+
+### Step 4: Configure Capacity (Optional)
+
+**Traffic Zones** — Areas with specific demand:
+```json
+{
+  "polygon": {"coordinates": [...]},
+  "demand_dl_mbps": 500,
+  "demand_ul_mbps": 100
+}
+```
+
+### Step 5: Run Planning
+
+Click **🚀 Tính toán** (Calculate)
+
+### Step 6: Review Planning Results
+
+**Key Outputs:**
+- **Selected Sites** — Site positions (lat/lon)
+- **Coverage Ratio** — % of service area covered
+- **Unserved Demand** — Capacity gaps
+- **Overloaded Sites** — Sites exceeding load limits
+
+### Step 7: Iterate
+
+- **Lock** good sites
+- **Adjust** constraints
+- **Re-run** planning
+- **Compare** results
+
+### Step 8: Export
+
+Export site positions for use in:
+- Radio planning tools (Atoll, Planet)
+- GIS applications
+- Field surveys
+
+---
+
+## Parameter Reference
+
+### Project
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| Name | Project label | "untitled" |
+| Area (km²) | Total coverage area | 50 |
+| Center Lat/Lon | Map center | 10.82, 106.63 |
+
+### Environment
+
+| Scenario | Description | Use Case |
+|----------|-------------|----------|
+| UMa | Urban Macro | High BS (25m+), outdoor |
+| UMi | Urban Micro | Low BS (<25m), outdoor |
+| RMa | Rural Macro | Wide area, low density |
+| InH | Indoor Hotspot | Shopping malls, stadiums |
+
+| Obstacle Density | Penetration Loss |
+|------------------|------------------|
+| heavy | 15–20 dB (dense urban) |
+| medium | 8–12 dB (suburban) |
+| light | 3–6 dB (rural) |
+
+### Base Station
+
+| Antenna Config | Gain | Beamforming | Use Case |
+|----------------|------|-------------|----------|
+| 64T64R | 23 dBi | 15 dB | High capacity urban |
+| 32T32R | 20 dBi | 12 dB | Standard urban |
+| 16T16R | 18 dBi | 9 dB | Suburban |
+| 8T8R | 15 dBi | 6 dB | Rural |
+| 4T4R | 12 dBi | 3 dB | Low capacity |
+| 2T2R | 9 dBi | 0 dB | Small cell |
+
+### Frequency
+
+| Band | Frequency | Typical Use |
+|------|-----------|-------------|
+| n78 | 3.5 GHz | 5G mid-band (TDD) |
+| n77 | 3.3–4.2 GHz | 5G mid-band (TDD) |
+| n41 | 2.5 GHz | 5G low-band (TDD) |
+| n8 | 900 MHz | 5G low-band (FDD) |
+| n28 | 700 MHz | 5G low-band (FDD) |
+| n71 | 600 MHz | 5G low-band (FDD) |
+
+### QoS
+
+| Service | SINR Req | Use Case |
+|---------|----------|----------|
+| VoNR | -3 dB | Voice calls |
+| Video HD | 5 dB | 1080p streaming |
+| Video 4K | 10 dB | 4K streaming |
+| Data | 0 dB | General data |
+| Gaming | 8 dB | Low latency gaming |
+| IoT | -5 dB | IoT sensors |
+
+---
+
+## CLI Reference
+
+### Quick Sizing
+
+```bash
+# From config file
+rf5g size --config examples/dense_urban_n78.json --output results.json
+
+# With command-line options
 rf5g size --area 50 --scenario UMa --band n78 --power 200
-```
 
-### Generate Reports
-
-```cmd
+# Generate report
 rf5g report --config my_config.json --format html
-rf5g report --config my_config.json --format md
+
+# Generate map
+rf5g map --config my_config.json --output coverage.html
 ```
 
-### Generate Coverage Map
+### Planning
 
-```cmd
-rf5g map --config my_config.json --output coverage_map.html
-rf5g map --area 50 --scenario UMa --band n78 --lat 10.78 --lon 106.70
-```
-
-### Generate Charts
-
-```cmd
-rf5g charts --config my_config.json --output-dir ./output
-```
-
-### Export Sites
-
-```cmd
-rf5g sites count --config my_config.json
-rf5g sites export-json --config my_config.json --output sites.json
-rf5g sites export-csv --config my_config.json --output sites.csv
-```
-
-### Run Geometry-Aware Planning
-
-```cmd
+```bash
+# Run geometry-aware planning
 rf5g plan --config planning_config.json --output plan_results.json
 ```
 
-### Display Lookup Tables
+### Sites Export
 
-```cmd
+```bash
+# Count sites
+rf5g sites count --config my_config.json
+
+# Export as JSON
+rf5g sites export-json --config my_config.json --output sites.json
+
+# Export as CSV
+rf5g sites export-csv --config my_config.json --output sites.csv
+```
+
+### Lookup Tables
+
+```bash
+# List all bands
 rf5g tables
+
+# Show specific band
 rf5g tables --band n78
 ```
 
-### Example Config Files
-
-See `examples/` directory for sample configurations:
-- `dense_urban_n78.json` — Urban macro, n78, 100MHz, 32T32R
-- `suburban_n77.json` — Suburban, n77, 50MHz, 8T8R
-- `rural_n8.json` — Rural macro, n8, 10MHz, 4T4R
+---
 
 ## Tips
 
-- **Start with presets** and customize from there
-- **Penetration loss** is the most sensitive parameter — adjust carefully
-- **Coverage probability** 0.95 vs 0.90 can mean 20–30% more sites
-- **Check capacity** — sometimes you need more sites for capacity than coverage
-- **Use the coverage map** to visualize site placement before deployment
+1. **Start with presets** — They have sensible defaults for common scenarios
+2. **Penetration loss** is the most sensitive parameter — adjust carefully
+3. **Coverage probability** 0.95 vs 0.90 can mean 20–30% more sites
+4. **Check capacity** — Sometimes you need more sites for capacity than coverage
+5. **Use warnings** — They highlight potential issues before deployment
+6. **Review assumptions** — Check Section 7 in reports for model limitations
 
-## Stopping the Server
+---
 
-- Press **Ctrl+C** in the command window, or
-- Close the browser tab and the command window
+## Standards Referenced
+
+- **3GPP TR 38.901** — Propagation models
+- **3GPP TS 38.104** — Base station RF requirements
+- **3GPP TS 38.214** — Physical layer measurements
+- **3GPP TS 38.306** — UE capabilities
+
+---
 
 ## Support
 
-- GitHub: https://github.com/nhnam/rf5g-sizing
-- License: MIT
+- **GitHub:** https://github.com/nhnam/rf5g-sizing
+- **License:** MIT

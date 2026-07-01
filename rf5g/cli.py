@@ -22,6 +22,7 @@ from .engine.capacity import calculate_capacity
 from .engine.qos_verifier import verify_qos
 from .engine.recommender import generate_recommendations
 from .engine.warnings import generate_warnings
+from .engine.summary import generate_executive_summary, format_summary_text
 from .engine.placement_planner import build_placement_plan, effective_planning_area_km2
 from .viz.coverage_map import (
     generate_coverage_map, generate_interactive_map,
@@ -281,6 +282,20 @@ def size(
 
     # Display results
     console.print(Panel(f"[bold blue]5G NR RF Sizing -- {result.project_name}[/bold blue]", expand=False))
+
+    # Executive Summary
+    summary = generate_executive_summary(result)
+    console.print(Panel(
+        f"[bold]Limiting Factor:[/bold] {summary.limiting_factor.upper()}\n"
+        f"[bold]Estimated Sites:[/bold] {summary.estimated_sites}\n"
+        f"[bold]Main Bottleneck:[/bold] {summary.main_bottleneck}\n"
+        f"[bold]Cell Radius:[/bold] {summary.cell_radius_m:.0f} m" +
+        (f"\n[bold]Coverage Ratio:[/bold] {summary.coverage_ratio:.1%}" if summary.coverage_ratio else "") +
+        (f"\n[bold]Capacity:[/bold] {summary.capacity_status}" if summary.capacity_status else "") +
+        (f"\n[bold yellow]Next Action:[/bold yellow] {summary.recommended_action}" if summary.recommended_action else ""),
+        title="📊 Executive Summary",
+        expand=False,
+    ))
 
     # Link budget table
     lb_table = Table(title="Link Budget", show_header=True, header_style="bold")

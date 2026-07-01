@@ -1,0 +1,50 @@
+{
+  "project": {
+    "name": "Capacity Hotspot n78",
+    "area_km2": 5,
+    "center_lat": 10.78,
+    "center_lon": 106.70
+  },
+  "environment": {
+    "scenario": "UMi",
+    "obstacle_density": "heavy",
+    "coverage_probability": 0.95
+  },
+  "base_station": {
+    "antenna_config": "64T64R",
+    "tx_power_w": 320,
+    "height_m": 15,
+    "sectors": 3,
+    "cable_loss_db": 0.5,
+    "noise_figure_db": 3.0
+  },
+  "frequency": {
+    "band": "n78",
+    "bandwidth_mhz": 100,
+    "scs_khz": 30,
+    "duplex": "TDD",
+    "tdd_dl_ratio": 0.75
+  },
+  "user_equipment": {
+    "power_class": "PC3",
+    "height_m": 1.5,
+    "antenna_gain_dbi": 0,
+    "body_loss_db": 0,
+    "noise_figure_db": 7.0
+  },
+  "margins": {
+    "interference_db": 6.0,
+    "shadow_fading_db": null,
+    "rain_attenuation_db": 0.0,
+    "penetration_db": 15.0,
+    "vegetation_db": 0.0,
+    "overlap_factor": 0.30
+  },
+  "qos": {
+    "primary_service": "video_4k",
+    "dl_per_user_mbps": 100,
+    "ul_per_user_mbps": 30,
+    "users_per_km2": 1000,
+    "concurrent_ratio": 0.15
+  }
+}
