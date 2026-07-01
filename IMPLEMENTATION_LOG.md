@@ -33,7 +33,7 @@ Suggested entry structure:
 ### 2026-07-01 — GitHub project setup and codebase exploration
 
 **Summary**
-Pushed planning artifacts to GitHub, created milestones and issues, and explored codebase for P0 implementation.
+Pushed planning artifacts to GitHub, created milestones and issues, and explored codebase for P0 implementation. Completed Issues #2, #3, #4, #5.
 
 **Completed**
 - Merged `archive-v1.4.1` into `main` (O2I fix, MIMO layers, API sync, version 1.4.1)
@@ -45,32 +45,23 @@ Pushed planning artifacts to GitHub, created milestones and issues, and explored
 - Created 12 GitHub labels (priority:P0-P2, type:*)
 - Created Milestone 1 tracking issue (#1)
 - Created 5 P0 issues for Milestone 1:
-  - #2: Sync CLI docs with actual commands
-  - #3: Add golden scenario regression suite
-  - #4: Expose model assumptions and approximations
-  - #5: Add scenario validity warnings
-  - #6: Align output schema semantics across surfaces
-- Explored codebase structure and identified doc issues:
-  - USER_GUIDE.md line 115-119: outdated CLI commands (`python -m rf5g.cli run` should be `rf5g size`)
-  - USER_GUIDE.md mentions `--preset` option that doesn't exist in current CLI
-  - INSTALL_GUIDE.md: version mismatch (1.4.0 vs 1.4.1)
+  - #2: Sync CLI docs with actual commands ✅
+  - #3: Add golden scenario regression suite ✅
+  - #4: Expose model assumptions and approximations ✅
+  - #5: Add scenario validity warnings ✅
+  - #6: Align output schema semantics across surfaces (pending)
+- **Issue #2**: Fixed USER_GUIDE.md CLI examples, INSTALL_GUIDE.md version, added CLI usage to README.md
+- **Issue #3**: Created test_golden_regression.py with 24 tests for 3 baseline scenarios
+- **Issue #4**: Added assumptions/limitations section to HTML and Markdown reports
+- **Issue #5**: Created warnings module with 17 warning codes, integrated into CLI and output schema
 
 **In progress**
-- Ready to implement P0 items
-
-**Codebase findings**
-- CLI commands: `size`, `plan`, `tables`, `map`, `report`, `charts`, `sites`
-- Example scenarios (for golden regression):
-  - `examples/dense_urban_n78.json` - UMa, n78, 100MHz, 32T32R
-  - `examples/suburban_n77.json` - UMa, n77, 50MHz, 8T8R
-  - `examples/rural_n8.json` - RMa, n8, 10MHz, 4T4R
-- Test files: test_integration.py, test_phase2-5.py, test_propagation.py
-- test_integration.py has PRD worked example but no frozen golden outputs
+- Issue #6: Align output schema semantics across surfaces
 
 **Next recommended actions**
-1. Fix USER_GUIDE.md CLI examples (Issue #2)
-2. Add golden scenario regression tests with frozen outputs (Issue #3)
-3. Update INSTALL_GUIDE.md version reference
+1. Complete Issue #6: Align output schema semantics
+2. Update tracking issue with completed items
+3. Close completed issues on GitHub
 
 ---
 
