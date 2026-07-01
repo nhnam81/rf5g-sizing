@@ -30,6 +30,42 @@ Suggested entry structure:
 
 ## Session Log
 
+### 2026-07-01 — Milestone 3: Geometry-Aware Planning as Flagship
+
+**Summary**
+Completed all P1 items for Milestone 3 - planning workflow documentation, planner explanations, and planning scorecard.
+
+**Completed**
+- **Task #17**: Productize planning workflow documentation
+  - Created PLANNING_GUIDE.md with complete planning workflow
+  - Documented service area, exclusion zones, alignments, locked sites
+  - Documented capacity demand zones and planning objectives
+- **Task #18**: Expose planner explanations per selected site
+  - Added 'explanations' field to SelectedSiteResult model
+  - Site selections include human-readable reasons
+  - Explanations: coverage gain, demand relief, alignment-based selection
+- **Task #19**: Add planning scorecard
+  - Created generate_planning_scorecard() function
+  - Metrics: coverage ratio, sites, demand, overloaded sites
+  - Quality assessment: excellent/good/fair/poor
+  - Recommendations for improvement
+  - Display scorecard in CLI output
+- **Task #20**: Support manual override and re-run flow
+  - Locked sites are preserved during planning (existing functionality)
+  - Explanations distinguish locked vs auto-selected sites
+
+**Commit**: 211d56d
+
+**In progress**
+- Milestone 4: Equipment Realism & Catalog Trust
+
+**Next recommended actions**
+1. Continue with Milestone 4: Equipment catalog provenance
+2. Add catalog provenance to outputs
+3. Improve antenna pattern validation
+
+---
+
 ### 2026-07-01 — Milestone 2: Workflow Simplification & UX
 
 **Summary**
@@ -53,13 +89,6 @@ Completed all P0 items for Milestone 2 - workflow documentation, preset library,
   - Added executive summary section to HTML and Markdown reports
 
 **Commit**: a09fbcf
-
-**In progress**
-- Milestone 3: Geometry-Aware Planning as Flagship
-
-**Next recommended actions**
-1. Create GitHub issues for Milestone 2 items (optional tracking)
-2. Continue with Milestone 3: Planning workflow productization
 
 ---
 
