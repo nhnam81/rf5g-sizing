@@ -109,14 +109,62 @@ Example config:
 
 ## CLI Mode (Advanced)
 
-For automation and scripting:
+For automation and scripting, use the `rf5g` CLI:
+
+### Calculate Sizing
 
 ```cmd
-python -m rf5g.cli run --config my_config.json --output results.json
-python -m rf5g.cli run --preset dense_urban_n78 --format json
+rf5g size --config my_config.json --output results.json
+rf5g size --area 50 --scenario UMa --band n78 --power 200
 ```
 
-Presets: `dense_urban_n78`, `suburban_n78`, `rural_n28`, `indoor_n77`, `urban_mmwave`
+### Generate Reports
+
+```cmd
+rf5g report --config my_config.json --format html
+rf5g report --config my_config.json --format md
+```
+
+### Generate Coverage Map
+
+```cmd
+rf5g map --config my_config.json --output coverage_map.html
+rf5g map --area 50 --scenario UMa --band n78 --lat 10.78 --lon 106.70
+```
+
+### Generate Charts
+
+```cmd
+rf5g charts --config my_config.json --output-dir ./output
+```
+
+### Export Sites
+
+```cmd
+rf5g sites count --config my_config.json
+rf5g sites export-json --config my_config.json --output sites.json
+rf5g sites export-csv --config my_config.json --output sites.csv
+```
+
+### Run Geometry-Aware Planning
+
+```cmd
+rf5g plan --config planning_config.json --output plan_results.json
+```
+
+### Display Lookup Tables
+
+```cmd
+rf5g tables
+rf5g tables --band n78
+```
+
+### Example Config Files
+
+See `examples/` directory for sample configurations:
+- `dense_urban_n78.json` — Urban macro, n78, 100MHz, 32T32R
+- `suburban_n77.json` — Suburban, n77, 50MHz, 8T8R
+- `rural_n8.json` — Rural macro, n8, 10MHz, 4T4R
 
 ## Tips
 

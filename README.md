@@ -56,6 +56,28 @@ pip install -e ".[web,viz]"
 streamlit run rf5g/web/app.py
 ```
 
+## CLI Usage
+
+```bash
+# Calculate sizing from config file
+rf5g size --config examples/dense_urban_n78.json --output results.json
+
+# Quick sizing with command-line options
+rf5g size --area 50 --scenario UMa --band n78 --power 200
+
+# Generate HTML report
+rf5g report --config examples/dense_urban_n78.json --format html
+
+# Generate interactive coverage map
+rf5g map --config examples/dense_urban_n78.json --output coverage.html
+
+# Export site positions
+rf5g sites export-json --config examples/dense_urban_n78.json --output sites.json
+
+# Run geometry-aware planning
+rf5g plan --config planning_config.json
+```
+
 ## License
 
 MIT License — see [LICENSE](LICENSE) for details.
