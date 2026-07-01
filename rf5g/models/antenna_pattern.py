@@ -1301,3 +1301,154 @@ def list_catalog_models() -> dict:
         "antennas": [(a["vendor"], a["model"]) for a in cat["antennas"]],
         "radios": [(r["vendor"], r["model"]) for r in cat["radios"]],
     }
+
+
+@dataclass
+class PatternValidationResult:
+    """Result of antenna pattern validation."""
+    valid: bool
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
+    is_fallback: bool = False
+    fallback_type: str = ""
+
+
+def validate_antenna_pattern(pattern: AntennaPattern) -> PatternValidationResult:
+    """Validate antenna pattern completeness and quality.
+
+    Checks:
+    - Pattern type consistency
+    - Horizontal pattern coverage (0-360°)
+    - Vertical pattern coverage (-90 to 90°)
+    - Gain reasonableness
+    - Beamwidth consistency
+    - Front-to-back ratio
+
+    Args:
+        pattern: AntennaPattern to validate
+
+    Returns:
+        PatternValidationResult with validation status and messages
+    """
+    result = PatternValidationResult(valid=True)
+
+    # Check pattern type
+    valid_types = ["omni", "sector", "beamforming", "custom", "catalog:synthetic", "catalog:atoll"]
+    if pattern.pattern_type not in valid_types:
+        result.warnings.append(f"Unknown pattern type: {pattern.pattern_type}")
+
+    # Check gain reasonableness
+    if pattern.gain_max_dbi < -10 or pattern.gain_max_dbi > 50:
+        result.warnings.append(f"Unusual gain value: {pattern.gain_max_dbi:.1f} dBi (expected -10 to 50 dBi)")
+
+    # Check omnidirectional patterns
+    if pattern.pattern_type == "omni":
+        result.info.append("Omnidirectional pattern - equal gain all azimuths")
+        if pattern.horizontal_pattern:
+            result.warnings.append("Omnidirectional pattern should not have horizontal pattern data")
+        return result
+
+    # Check sector/beamforming patterns
+    if pattern.pattern_type in ["sector", "beamforming", "custom", "catalog:synthetic", "catalog:atoll"]:
+        # Check horizontal pattern coverage
+        if not pattern.horizontal_pattern:
+            result.errors.append("Missing horizontal pattern data")
+            result.valid = False
+            result.is_fallback = True
+            result.fallback_type = "cosine"
+            result.warnings.append("Using cosine fallback pattern - no horizontal pattern data")
+        else:
+            # Check azimuth coverage
+            az_coverage = len(pattern.horizontal_pattern)
+            if az_coverage < 360:
+                result.warnings.append(f"Horizontal pattern covers only {az_coverage} azimuth values (expected 360)")
+
+            # Check for gaps in coverage
+            az_keys = sorted(pattern.horizontal_pattern.keys())
+            if az_keys:
+                gaps = []
+                for i in range(len(az_keys) - 1):
+                    if az_keys[i + 1] - az_keys[i] > 1:
+                        gaps.append((az_keys[i], az_keys[i + 1]))
+                if gaps:
+                    result.warnings.append(f"Pattern has {len(gaps)} azimuth gaps, interpolation will be used")
+
+            # Check for null values in main lobe
+            main_lobe_gains = [pattern.horizontal_pattern.get(a, -60) for a in range(-60, 61)]
+            if max(main_lobe_gains) < -10:
+                result.warnings.append("Main lobe gain is very low (< -10 dB relative)")
+
+        # Check vertical pattern
+        if not pattern.vertical_pattern:
+            result.info.append("No vertical pattern - using simplified vertical model")
+        else:
+            el_keys = sorted(pattern.vertical_pattern.keys())
+            if el_keys:
+                if min(el_keys) > -30 or max(el_keys) < 30:
+                    result.warnings.append(f"Vertical pattern covers limited elevation range ({min(el_keys)}° to {max(el_keys)}°)")
+
+        # Check beamwidth consistency
+        if pattern.beamwidth_h_deg <= 0 or pattern.beamwidth_h_deg > 360:
+            result.warnings.append(f"Invalid horizontal beamwidth: {pattern.beamwidth_h_deg}°")
+
+        # Check front-to-back ratio
+        if pattern.front_to_back_db < 0:
+            result.warnings.append(f"Negative front-to-back ratio: {pattern.front_to_back_db:.1f} dB")
+        elif pattern.front_to_back_db > 40:
+            result.warnings.append(f"Very high front-to-back ratio: {pattern.front_to_back_db:.1f} dB (verify if realistic)")
+
+    # Check source
+    if pattern.source == "built-in":
+        result.info.append(f"Built-in pattern: {pattern.name}")
+    elif pattern.source == "catalog:atoll":
+        result.info.append("Pattern from catalog (Atoll format)")
+    elif pattern.source == "catalog:synthetic":
+        result.info.append("Pattern derived from catalog specifications")
+    elif pattern.source in ["atoll", "csv", "json", "atoll_txt", "msi"]:
+        result.info.append(f"Imported pattern (source: {pattern.source})")
+
+    return result
+
+
+def pattern_preview_text(pattern: AntennaPattern) -> str:
+    """Generate a text preview of antenna pattern characteristics.
+
+    Args:
+        pattern: AntennaPattern to preview
+
+    Returns:
+        Human-readable text summary
+    """
+    lines = [
+        f"Pattern: {pattern.name}",
+        f"Type: {pattern.pattern_type}",
+        f"Source: {pattern.source}",
+        f"Frequency: {pattern.frequency_mhz:.0f} MHz",
+        f"Peak Gain: {pattern.gain_max_dbi:.1f} dBi",
+    ]
+
+    if pattern.pattern_type != "omni":
+        lines.append(f"Horizontal Beamwidth: {pattern.beamwidth_h_deg:.1f}°")
+        if pattern.beamwidth_v_deg:
+            lines.append(f"Vertical Beamwidth: {pattern.beamwidth_v_deg:.1f}°")
+        if pattern.front_to_back_db:
+            lines.append(f"Front-to-Back Ratio: {pattern.front_to_back_db:.1f} dB")
+        if pattern.tilt_deg:
+            lines.append(f"Electrical Downtilt: {pattern.tilt_deg:.1f}°")
+
+    # Validation summary
+    validation = validate_antenna_pattern(pattern)
+    if validation.warnings:
+        lines.append("")
+        lines.append("Warnings:")
+        for w in validation.warnings:
+            lines.append(f"  ⚠ {w}")
+
+    if validation.info:
+        lines.append("")
+        lines.append("Info:")
+        for i in validation.info:
+            lines.append(f"  ℹ {i}")
+
+    return "\n".join(lines)

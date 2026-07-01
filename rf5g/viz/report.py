@@ -37,6 +37,20 @@ REPORT_TEMPLATE = """# 5G NR RF Coverage Sizing Report
 
 ---
 
+## 0. Equipment Provenance
+
+| Parameter | Value |
+|---|---|
+| **Equipment Source** | {{ "Catalog (overrides applied)" if result.catalog_overrides_applied else "Built-in defaults" }} |
+| **TX Power** | {{ result.tx_power_w }}W{% if result.input_tx_power_w != result.tx_power_w %} (input: {{ result.input_tx_power_w }}W → catalog: {{ result.tx_power_w }}W){% endif %} |
+| **Antenna Config** | {{ result.antenna_config }}{% if result.input_antenna_config != result.antenna_config %} (input: {{ result.input_antenna_config }} → catalog: {{ result.antenna_config }}){% endif %} |
+{% if result.effective_antenna_gain_dbi %}| **Effective Antenna Gain** | {{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi |{% endif %}
+{% if result.effective_pattern_source %}| **Pattern Source** | {{ result.effective_pattern_source }} |{% endif %}
+{% if result.radio_details %}| **Radio** | {{ result.radio_details.vendor or "" }} {{ result.radio_details.model or "" }}{% if result.radio_details.source_pdf %} ({{ result.radio_details.source_pdf }}){% endif %} |{% endif %}
+{% if result.antenna_details %}| **Antenna** | {{ result.antenna_details.vendor or "" }} {{ result.antenna_details.model or "" }}{% if result.antenna_details.source_pdf %} ({{ result.antenna_details.source_pdf }}){% endif %} |{% endif %}
+
+---
+
 ## 1. Link Budget
 
 | Parameter | DL | UL |
@@ -203,6 +217,19 @@ li { margin: 3px 0; color: #666; font-size: 13px; }
 {% endif %}
 </table>
 <p style="margin-top: 10px; margin-bottom: 0;"><strong>Next Action:</strong> {{ summary.recommended_action }}</p>
+</div>
+
+<h2>0. Equipment Provenance</h2>
+<div class="card">
+<table>
+<tr><td><strong>Equipment Source</strong></td><td>{{ "Catalog (overrides applied)" if result.catalog_overrides_applied else "Built-in defaults" }}</td></tr>
+<tr><td><strong>TX Power</strong></td><td>{{ result.tx_power_w }}W{% if result.input_tx_power_w != result.tx_power_w %} <em>(input: {{ result.input_tx_power_w }}W → catalog: {{ result.tx_power_w }}W)</em>{% endif %}</td></tr>
+<tr><td><strong>Antenna Config</strong></td><td>{{ result.antenna_config }}{% if result.input_antenna_config != result.antenna_config %} <em>(input: {{ result.input_antenna_config }} → catalog: {{ result.antenna_config }})</em>{% endif %}</td></tr>
+{% if result.effective_antenna_gain_dbi %}<tr><td><strong>Effective Antenna Gain</strong></td><td>{{ "%.1f" | format(result.effective_antenna_gain_dbi) }} dBi</td></tr>{% endif %}
+{% if result.effective_pattern_source %}<tr><td><strong>Pattern Source</strong></td><td>{{ result.effective_pattern_source }}</td></tr>{% endif %}
+{% if result.radio_details %}<tr><td><strong>Radio</strong></td><td>{{ result.radio_details.vendor or "" }} {{ result.radio_details.model or "" }}{% if result.radio_details.source_pdf %} <em>({{ result.radio_details.source_pdf }})</em>{% endif %}</td></tr>{% endif %}
+{% if result.antenna_details %}<tr><td><strong>Antenna</strong></td><td>{{ result.antenna_details.vendor or "" }} {{ result.antenna_details.model or "" }}{% if result.antenna_details.source_pdf %} <em>({{ result.antenna_details.source_pdf }})</em>{% endif %}</td></tr>{% endif %}
+</table>
 </div>
 
 <h2>1. Link Budget</h2>

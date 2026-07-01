@@ -347,6 +347,59 @@ def size(
 
         console.print(cap_table)
 
+    # Equipment Provenance
+    provenance_lines = []
+    if result.catalog_overrides_applied:
+        provenance_lines.append("[bold]Equipment Source:[/bold] Catalog (overrides applied)")
+    else:
+        provenance_lines.append("[bold]Equipment Source:[/bold] Built-in defaults")
+
+    if result.effective_antenna_gain_dbi is not None:
+        provenance_lines.append(f"[bold]Effective Antenna Gain:[/bold] {result.effective_antenna_gain_dbi:.1f} dBi")
+
+    if result.effective_pattern_source:
+        provenance_lines.append(f"[bold]Pattern Source:[/bold] {result.effective_pattern_source}")
+
+    if result.radio_details:
+        radio_info = []
+        if result.radio_details.vendor:
+            radio_info.append(result.radio_details.vendor)
+        if result.radio_details.model:
+            radio_info.append(result.radio_details.model)
+        if result.radio_details.source_pdf:
+            radio_info.append(f"({result.radio_details.source_pdf})")
+        if radio_info:
+            provenance_lines.append(f"[bold]Radio:[/bold] {' '.join(radio_info)}")
+
+    if result.antenna_details:
+        ant_info = []
+        if result.antenna_details.vendor:
+            ant_info.append(result.antenna_details.vendor)
+        if result.antenna_details.model:
+            ant_info.append(result.antenna_details.model)
+        if result.antenna_details.source_pdf:
+            ant_info.append(f"({result.antenna_details.source_pdf})")
+        if result.antenna_details.pattern_asset:
+            ant_info.append(f"[{result.antenna_details.pattern_asset}]")
+        if ant_info:
+            provenance_lines.append(f"[bold]Antenna:[/bold] {' '.join(ant_info)}")
+
+    # Check for input vs effective differences
+    if result.input_tx_power_w != result.tx_power_w:
+        provenance_lines.append(f"[bold]TX Power:[/bold] {result.input_tx_power_w}W → {result.tx_power_w}W (catalog override)")
+    else:
+        provenance_lines.append(f"[bold]TX Power:[/bold] {result.tx_power_w}W")
+
+    if result.input_antenna_config != result.antenna_config:
+        provenance_lines.append(f"[bold]Antenna Config:[/bold] {result.input_antenna_config} → {result.antenna_config} (catalog override)")
+
+    if provenance_lines:
+        console.print(Panel(
+            "\n".join(provenance_lines),
+            title="🔧 Equipment Provenance",
+            expand=False,
+        ))
+
     # QoS
     if result.qos_verification:
         qos_table = Table(title="QoS Verification", show_header=True, header_style="bold")
