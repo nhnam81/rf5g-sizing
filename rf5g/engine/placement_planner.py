@@ -115,6 +115,7 @@ def build_placement_plan(
                     azimuths_deg=azimuths,
                     beamwidth_deg=beamwidth,
                     status=planned.status,
+                    explanations=[f"{planned.status} site preserved"] if planned.status in {"locked", "existing"} else ["manual seed site"],
                 )
             )
             selected_positions.append((planned.lat, planned.lon))
@@ -218,6 +219,7 @@ def build_placement_plan(
                 azimuths_deg=best["azimuths_deg"],
                 beamwidth_deg=best["beamwidth_deg"],
                 status="selected",
+                explanations=best["reasons"],
             )
         )
         selected_positions.append((best["lat"], best["lon"]))

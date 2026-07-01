@@ -22,7 +22,7 @@ from .engine.capacity import calculate_capacity
 from .engine.qos_verifier import verify_qos
 from .engine.recommender import generate_recommendations
 from .engine.warnings import generate_warnings
-from .engine.summary import generate_executive_summary, format_summary_text
+from .engine.summary import generate_executive_summary, format_summary_text, generate_planning_scorecard, format_scorecard_text
 from .engine.placement_planner import build_placement_plan, effective_planning_area_km2
 from .viz.coverage_map import (
     generate_coverage_map, generate_interactive_map,
@@ -379,6 +379,23 @@ def size(
                 "info": "dim",
             }.get(w.severity, "white")
             console.print(f"  [{severity_style}][{w.code}] {w.message}[/{severity_style}]")
+
+    # Planning scorecard (if planning result exists)
+    if result.placement_plan:
+        try:
+            scorecard = generate_planning_scorecard(result)
+            console.print(Panel(
+                f"[bold]Coverage Quality:[/bold] {scorecard.coverage_quality.upper()}\n"
+                f"[bold]Service Area:[/bold] {scorecard.service_area_km2:.2f} km²\n"
+                f"[bold]Coverage Ratio:[/bold] {scorecard.coverage_ratio:.1%}\n"
+                f"[bold]Sites:[/bold] {scorecard.total_sites} (locked: {scorecard.locked_sites}, auto: {scorecard.auto_selected_sites})" +
+                (f"\n[bold]DL Unserved:[/bold] {scorecard.unserved_dl_gbps:.2f} Gbps" if scorecard.unserved_dl_gbps else "") +
+                (f"\n[bold]Overloaded:[/bold] {scorecard.overloaded_sites}" if scorecard.overloaded_sites else ""),
+                title="📊 Planning Scorecard",
+                expand=False,
+            ))
+        except Exception:
+            pass  # Skip scorecard if planning result is incomplete
 
     # Save output
     if output:

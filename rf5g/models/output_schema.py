@@ -112,6 +112,7 @@ class SelectedSiteResult(BaseModel):
     estimated_dl_load_mbps: Optional[float] = None
     estimated_ul_load_mbps: Optional[float] = None
     overloaded: bool = False
+    explanations: list[str] = Field(default_factory=list)  # Human-readable reasons for selection
 
 
 class PlacementMetrics(BaseModel):
