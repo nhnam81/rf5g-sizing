@@ -7,12 +7,12 @@ dist/
 build/
 *.egg
 
-# Temp/test files
+# Temp/test files (root level only)
 inspect_map.html
 inspect_map.py
-test_*.py
-verify_*.py
-check_*.py
+/test_*.py
+/verify_*.py
+/check_*.py
 extract_*.py
 patch_*.py
 retrain_*.py
