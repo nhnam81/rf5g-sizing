@@ -30,38 +30,54 @@ Suggested entry structure:
 
 ## Session Log
 
-### 2026-07-01 — GitHub project setup and codebase exploration
+### 2026-07-01 — Milestone 2: Workflow Simplification & UX
 
 **Summary**
-Pushed planning artifacts to GitHub, created milestones and issues, and explored codebase for P0 implementation. Completed Issues #2, #3, #4, #5.
+Completed all P0 items for Milestone 2 - workflow documentation, preset library, and executive summary.
 
 **Completed**
-- Merged `archive-v1.4.1` into `main` (O2I fix, MIMO layers, API sync, version 1.4.1)
-- Pushed all planning artifacts to GitHub:
-  - ROADMAP.md, BACKLOG.md, IMPLEMENTATION_LOG.md
-  - .github/ISSUE_TEMPLATE/ (5 issue forms)
-  - .github/tracking-issues/ (5 milestone templates)
-- Created 5 GitHub milestones via API
-- Created 12 GitHub labels (priority:P0-P2, type:*)
-- Created Milestone 1 tracking issue (#1)
-- Created 5 P0 issues for Milestone 1:
-  - #2: Sync CLI docs with actual commands ✅
-  - #3: Add golden scenario regression suite ✅
-  - #4: Expose model assumptions and approximations ✅
-  - #5: Add scenario validity warnings ✅
-  - #6: Align output schema semantics across surfaces (pending)
-- **Issue #2**: Fixed USER_GUIDE.md CLI examples, INSTALL_GUIDE.md version, added CLI usage to README.md
-- **Issue #3**: Created test_golden_regression.py with 24 tests for 3 baseline scenarios
-- **Issue #4**: Added assumptions/limitations section to HTML and Markdown reports
-- **Issue #5**: Created warnings module with 17 warning codes, integrated into CLI and output schema
+- **Task #13**: Define canonical user workflow
+  - Created WORKFLOW.md with Quick Sizing and Planning workflows
+  - Updated README.md with workflow overview
+- **Task #14**: Split Quick Sizing vs Planning modes
+  - Rewrote USER_GUIDE.md with structured workflow sections
+  - Clear separation of simple sizing and advanced planning
+- **Task #15**: Build curated preset library
+  - Added examples/README.md with preset documentation
+  - Added indoor_hotspot_n77.json preset
+  - Added capacity_hotspot_n78.json preset
+  - Total: 5 presets covering common scenarios
+- **Task #16**: Improve results summary for decision-making
+  - Created rf5g/engine/summary.py for executive summaries
+  - Added executive summary to CLI output
+  - Added executive summary section to HTML and Markdown reports
+
+**Commit**: a09fbcf
 
 **In progress**
-- Issue #6: Align output schema semantics across surfaces
+- Milestone 3: Geometry-Aware Planning as Flagship
 
 **Next recommended actions**
-1. Complete Issue #6: Align output schema semantics
-2. Update tracking issue with completed items
-3. Close completed issues on GitHub
+1. Create GitHub issues for Milestone 2 items (optional tracking)
+2. Continue with Milestone 3: Planning workflow productization
+
+---
+
+### 2026-07-01 — Milestone 1: Core Trust & Product Coherence
+
+**Summary**
+Completed all P0 items for Milestone 1 - docs sync, regression tests, assumptions, warnings, and output schema consistency.
+
+**Completed**
+- Issue #2: Sync CLI docs with actual commands ✅
+- Issue #3: Add golden scenario regression suite ✅
+- Issue #4: Expose model assumptions and approximations ✅
+- Issue #5: Add scenario validity warnings ✅
+- Issue #6: Align output schema semantics across surfaces ✅
+
+**Commits**: 7e59075, ca516d3, 303d6f6, 6ed3ab5, d280da0
+
+**Tests added**: 53 tests (24 + 10 + 19)
 
 ---
 
