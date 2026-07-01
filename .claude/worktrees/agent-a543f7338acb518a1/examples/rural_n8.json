@@ -1,0 +1,50 @@
+{
+  "project": {
+    "name": "Rural n8 10MHz",
+    "area_km2": 500,
+    "center_lat": 10.78,
+    "center_lon": 106.70
+  },
+  "environment": {
+    "scenario": "RMa",
+    "obstacle_density": "light",
+    "coverage_probability": 0.90
+  },
+  "base_station": {
+    "antenna_config": "4T4R",
+    "tx_power_w": 200,
+    "height_m": 35,
+    "sectors": 3,
+    "cable_loss_db": 2.0,
+    "noise_figure_db": 3.0
+  },
+  "frequency": {
+    "band": "n8",
+    "bandwidth_mhz": 10,
+    "scs_khz": 15,
+    "duplex": "FDD",
+    "tdd_dl_ratio": 0.50
+  },
+  "user_equipment": {
+    "power_class": "PC3",
+    "height_m": 1.5,
+    "antenna_gain_dbi": 0,
+    "body_loss_db": 0,
+    "noise_figure_db": 7.0
+  },
+  "margins": {
+    "interference_db": 2.0,
+    "shadow_fading_db": null,
+    "rain_attenuation_db": 0.5,
+    "penetration_db": 5.0,
+    "vegetation_db": 3.0,
+    "overlap_factor": 0.15
+  },
+  "qos": {
+    "primary_service": "vonr",
+    "dl_per_user_mbps": 5,
+    "ul_per_user_mbps": 2,
+    "users_per_km2": 20,
+    "concurrent_ratio": 0.10
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "2T2R":  {"tx_antennas": 2, "rx_antennas": 2, "antenna_gain_dbi": 14, "mimo_gain_db": 3, "beamforming_gain_db": 0, "description": "2TX 2RX (basic MIMO)"},
+  "4T4R":  {"tx_antennas": 4, "rx_antennas": 4, "antenna_gain_dbi": 16, "mimo_gain_db": 6, "beamforming_gain_db": 3, "description": "4TX 4RX (standard macro)"},
+  "8T8R":  {"tx_antennas": 8, "rx_antennas": 8, "antenna_gain_dbi": 17, "mimo_gain_db": 9, "beamforming_gain_db": 6, "description": "8TX 8RX (high-gain macro)"},
+  "16T16R": {"tx_antennas": 16, "rx_antennas": 16, "antenna_gain_dbi": 18, "mimo_gain_db": 9, "beamforming_gain_db": 9, "description": "16TX 16RX (massive MIMO)"},
+  "32T32R": {"tx_antennas": 32, "rx_antennas": 32, "antenna_gain_dbi": 20, "mimo_gain_db": 9, "beamforming_gain_db": 12, "description": "32TX 32RX (massive MIMO high)"},
+  "64T64R": {"tx_antennas": 64, "rx_antennas": 64, "antenna_gain_dbi": 22, "mimo_gain_db": 9, "beamforming_gain_db": 15, "description": "64TX 64RX (premium massive MIMO)"},
+  "_ue_antenna": {"gain_dbi": 0, "mimo_layers_dl": 4, "mimo_layers_ul": 2, "description": "UE omnidirectional, 0 dBi"}
+}

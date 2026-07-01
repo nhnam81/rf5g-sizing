@@ -1,0 +1,22 @@
+{
+  "_comment": "3GPP TS 38.214 Table 5.2.2.1-2 + TS 38.306",
+  "table": [
+    {"cqi": 1,  "modulation": "QPSK", "code_rate_x1024": 78,  "spectral_efficiency": 0.1523, "sinr_db": -8},
+    {"cqi": 2,  "modulation": "QPSK", "code_rate_x1024": 120, "spectral_efficiency": 0.2344, "sinr_db": -6},
+    {"cqi": 3,  "modulation": "QPSK", "code_rate_x1024": 193, "spectral_efficiency": 0.3770, "sinr_db": -4},
+    {"cqi": 4,  "modulation": "QPSK", "code_rate_x1024": 308, "spectral_efficiency": 0.6016, "sinr_db": -2},
+    {"cqi": 5,  "modulation": "QPSK", "code_rate_x1024": 449, "spectral_efficiency": 0.8770, "sinr_db": 0},
+    {"cqi": 6,  "modulation": "QPSK", "code_rate_x1024": 602, "spectral_efficiency": 1.1758, "sinr_db": 2},
+    {"cqi": 7,  "modulation": "16QAM","code_rate_x1024": 378, "spectral_efficiency": 1.4766, "sinr_db": 4},
+    {"cqi": 8,  "modulation": "16QAM","code_rate_x1024": 490, "spectral_efficiency": 1.9141, "sinr_db": 6},
+    {"cqi": 9,  "modulation": "16QAM","code_rate_x1024": 616, "spectral_efficiency": 2.4063, "sinr_db": 8},
+    {"cqi": 10, "modulation": "64QAM","code_rate_x1024": 466, "spectral_efficiency": 2.7305, "sinr_db": 10},
+    {"cqi": 11, "modulation": "64QAM","code_rate_x1024": 567, "spectral_efficiency": 3.3223, "sinr_db": 12},
+    {"cqi": 12, "modulation": "64QAM","code_rate_x1024": 666, "spectral_efficiency": 3.9023, "sinr_db": 14},
+    {"cqi": 13, "modulation": "64QAM","code_rate_x1024": 772, "spectral_efficiency": 4.5234, "sinr_db": 16},
+    {"cqi": 14, "modulation": "256QAM","code_rate_x1024": 740, "spectral_efficiency": 5.1152, "sinr_db": 18},
+    {"cqi": 15, "modulation": "256QAM","code_rate_x1024": 850, "spectral_efficiency": 5.5547, "sinr_db": 20}
+  ],
+  "_sinr_to_cqi": "Linear interpolation between SINR thresholds",
+  "_mcs_table": "Derived from code_rate and modulation order"
+}

@@ -1,0 +1,7 @@
+{
+  "PC1": {"power_class": 1, "tx_power_dbm": 31, "description": "Fixed wireless CPE"},
+  "PC2": {"power_class": 2, "tx_power_dbm": 26, "description": "Vehicle-mounted"},
+  "PC3": {"power_class": 3, "tx_power_dbm": 23, "description": "Handheld (default)"},
+  "PC4": {"power_class": 4, "tx_power_dbm": 20, "description": "M2M/IoT low-power"},
+  "_default": "PC3"
+}

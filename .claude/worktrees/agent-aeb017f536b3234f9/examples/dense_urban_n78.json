@@ -1,0 +1,50 @@
+{
+  "project": {
+    "name": "Dense Urban n78 100MHz",
+    "area_km2": 50,
+    "center_lat": 10.78,
+    "center_lon": 106.70
+  },
+  "environment": {
+    "scenario": "UMa",
+    "obstacle_density": "heavy",
+    "coverage_probability": 0.95
+  },
+  "base_station": {
+    "antenna_config": "32T32R",
+    "tx_power_w": 200,
+    "height_m": 25,
+    "sectors": 3,
+    "cable_loss_db": 1.0,
+    "noise_figure_db": 3.5
+  },
+  "frequency": {
+    "band": "n78",
+    "bandwidth_mhz": 100,
+    "scs_khz": 30,
+    "duplex": "TDD",
+    "tdd_dl_ratio": 0.70
+  },
+  "user_equipment": {
+    "power_class": "PC3",
+    "height_m": 1.5,
+    "antenna_gain_dbi": 0,
+    "body_loss_db": 0,
+    "noise_figure_db": 7.0
+  },
+  "margins": {
+    "interference_db": 3.0,
+    "shadow_fading_db": null,
+    "rain_attenuation_db": 1.0,
+    "penetration_db": 10.0,
+    "vegetation_db": 0.0,
+    "overlap_factor": 0.25
+  },
+  "qos": {
+    "primary_service": "mixed",
+    "dl_per_user_mbps": 20,
+    "ul_per_user_mbps": 5,
+    "users_per_km2": 300,
+    "concurrent_ratio": 0.10
+  }
+}
