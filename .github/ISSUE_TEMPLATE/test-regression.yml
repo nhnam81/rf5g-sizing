@@ -1,0 +1,134 @@
+name: Test / Regression
+description: Issue form for golden scenarios, contract tests, warning coverage, and regression protection
+title: "[Test] "
+labels:
+  - type:test
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for issues whose main output is test coverage, regression protection, or a verification harness.
+
+        Anchor the issue to the matching item in `BACKLOG.md` and make the expected failure signal explicit.
+
+  - type: input
+    id: backlog_item
+    attributes:
+      label: Backlog item
+      description: Copy the matching issue title from BACKLOG.md.
+      placeholder: "[P0][test][engine] Add golden scenario regression suite"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options:
+        - Milestone 1 — Core Trust & Product Coherence
+        - Milestone 5 — Decision Support & Release Readiness
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: affected_areas
+    attributes:
+      label: Affected areas
+      options:
+        - label: Engine calculations
+        - label: API contract
+        - label: UI-facing summaries
+        - label: Warning coverage
+        - label: Reports
+        - label: Example scenarios
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      placeholder: |
+        Core outputs should not drift silently as the engine evolves.
+    validations:
+      required: true
+
+  - type: textarea
+    id: baselines
+    attributes:
+      label: Baseline scenarios or behaviors to freeze
+      description: List the scenarios, outputs, or warnings that must be protected.
+      placeholder: |
+        - dense_urban_n78.json
+        - suburban_n77.json
+        - rural_n8.json
+        Freeze:
+        - cell radius
+        - site count
+        - limiting link
+        - SINR/CQI
+        - capacity summary
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        - [ ] Define the baseline scenarios
+        - [ ] Freeze the expected outputs or contracts
+        - [ ] Add regression tests with clear failure messages
+        - [ ] Document how intentional baseline updates should be handled
+    validations:
+      required: true
+
+  - type: textarea
+    id: failure_signal
+    attributes:
+      label: Expected failure signal
+      description: Describe what should break when a regression occurs.
+      placeholder: |
+        Test failure should show which baseline field drifted and how the actual value differed from the frozen expectation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] At least 3 baseline scenarios are covered
+        - [ ] Regressions fail clearly
+        - [ ] Intentional updates to baselines are documented
+    validations:
+      required: true
+
+  - type: textarea
+    id: labels_to_apply
+    attributes:
+      label: Labels to apply
+      placeholder: |
+        priority:P0
+        type:test
+        type:engine
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: The tests fail when the protected behavior drifts unexpectedly.
+        - label: The tests are stable enough to use for future regression checks.
+        - label: Any fixture or baseline update path is documented.
+        - label: Related docs or examples are updated if the protected behavior intentionally changes.
+        - label: New assumptions, warnings, or limitations are surfaced clearly where relevant.

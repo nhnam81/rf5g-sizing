@@ -1,0 +1,144 @@
+name: Feature / Implementation
+description: Default issue form for implementation work derived from BACKLOG.md
+title: "[Backlog] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for most implementation work from `BACKLOG.md`.
+
+        Keep the issue aligned with the backlog format:
+        - **Why**
+        - **Scope**
+        - **Acceptance criteria**
+
+        Apply `priority:*` and `type:*` labels after creating the issue.
+
+  - type: input
+    id: backlog_item
+    attributes:
+      label: Backlog item
+      description: Copy the matching issue title from BACKLOG.md.
+      placeholder: "[P0][api][ui][docs] Align output schema semantics across surfaces"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      description: Choose the milestone this work belongs to.
+      options:
+        - Milestone 1 — Core Trust & Product Coherence
+        - Milestone 2 — Workflow Simplification & UX
+        - Milestone 3 — Geometry-Aware Planning as Flagship
+        - Milestone 4 — Equipment Realism & Catalog Trust
+        - Milestone 5 — Decision Support & Release Readiness
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Match the priority from BACKLOG.md.
+      options:
+        - P0
+        - P1
+        - P2
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Affected surfaces
+      description: Select every surface this issue touches.
+      options:
+        - label: Engine
+        - label: CLI
+        - label: API
+        - label: UI
+        - label: Docs
+        - label: Planning
+        - label: Reporting
+        - label: Tests
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Briefly describe the outcome this issue should deliver.
+      placeholder: |
+        Align result summary naming and semantics across CLI, API, and UI so the same input produces equivalent top-level meaning.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Copy or adapt the Why section from BACKLOG.md.
+      placeholder: |
+        The same input should lead to the same summary meaning regardless of entrypoint.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Write a concrete execution checklist.
+      placeholder: |
+        - [ ] Audit the current result summaries in CLI, API, and UI
+        - [ ] Normalize naming for shared top-level concepts
+        - [ ] Align recommendation, QoS, and capacity summary semantics
+        - [ ] Add or update tests for the shared output contract
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Write completion checks that can be verified later.
+      placeholder: |
+        - [ ] Equivalent summaries appear across CLI, API, and UI for the same input
+        - [ ] Contract or snapshot tests cover the main API output shape
+        - [ ] No obvious naming drift remains for shared concepts
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies or blockers
+      description: Note any prerequisite issues, open questions, or blocked work.
+      placeholder: |
+        Depends on:
+        - Docs sync issue
+        Blockers:
+        - Need agreement on canonical top-level summary names
+
+  - type: textarea
+    id: labels_to_apply
+    attributes:
+      label: Labels to apply
+      description: GitHub Issue Forms cannot derive labels dynamically from the backlog item. List the labels that should be applied after issue creation.
+      placeholder: |
+        priority:P0
+        type:api
+        type:ui
+        type:docs
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      description: Confirm the shared completion bar for this issue.
+      options:
+        - label: The implementation works end-to-end for its intended surface.
+        - label: Relevant tests are added or updated.
+        - label: Docs or examples are updated if behavior changes.
+        - label: The change does not create drift between CLI, API, and UI.
+        - label: New assumptions, warnings, or limitations are surfaced clearly where relevant.

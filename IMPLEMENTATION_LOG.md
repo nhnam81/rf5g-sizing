@@ -1,0 +1,65 @@
+# rf5g-sizing Implementation Log
+
+> Last updated: 2026-06-30
+> Purpose: durable progress log for sprint/session-level work
+
+Use this file to record what was completed, what remains blocked, and what should happen next.
+
+## How to use
+
+For each working session or sprint:
+- add a dated entry under **Session Log**
+- record completed work in repo terms, not chat terms
+- note blockers, assumptions, and follow-up items
+- link back to `ROADMAP.md`, `BACKLOG.md`, and GitHub issues when they exist
+
+Suggested entry structure:
+- Date
+- Summary
+- Completed
+- In progress
+- Blockers / risks
+- Next recommended actions
+
+## Current planning artifacts
+
+- `ROADMAP.md` — milestone direction and sequencing
+- `BACKLOG.md` — issue-ready backlog grouped by milestone
+- `.github/ISSUE_TEMPLATE/` — reusable GitHub Issue Forms
+- `.github/tracking-issues/` — copy/paste-ready milestone tracking issue bodies
+
+## Session Log
+
+### 2026-06-30 — Planning and tracking foundation
+
+**Summary**
+Established durable project-planning and GitHub issue-tracking artifacts so future sessions can continue implementation without rebuilding roadmap structure.
+
+**Completed**
+- Added `ROADMAP.md` with milestone-level direction, priorities, and suggested sequencing
+- Added `BACKLOG.md` with issue-ready backlog entries and Definition of Done
+- Added GitHub Issue Forms under `.github/ISSUE_TEMPLATE/`:
+  - `feature.yml`
+  - `docs-workflow.yml`
+  - `test-regression.yml`
+  - `release-checklist.yml`
+  - `config.yml`
+- Added milestone tracking issue bodies under `.github/tracking-issues/`
+- Updated `README.md` to point to planning/tracking artifacts
+- Updated `BACKLOG.md` with GitHub issue flow guidance
+- Validated issue template YAML files successfully
+
+**In progress**
+- No implementation milestone work has started yet
+
+**Blockers / risks**
+- GitHub Issue Forms were validated as YAML locally, but the GitHub web issue chooser has not been manually verified yet
+- No actual GitHub issues or milestone trackers have been opened in the remote repository yet
+
+**Next recommended actions**
+1. Open Milestone 1 tracking issue using `.github/tracking-issues/milestone-1-core-trust-product-coherence.md`
+2. Create execution issues from `BACKLOG.md` using the new GitHub Issue Forms
+3. Start with the first P0 items:
+   - Sync CLI docs with actual commands
+   - Add golden scenario regression suite
+   - Expose model assumptions and approximations

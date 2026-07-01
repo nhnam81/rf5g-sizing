@@ -1,0 +1,135 @@
+name: Docs / Workflow Alignment
+description: Issue form for docs sync, canonical workflow, and cross-surface coherence work
+title: "[Docs] "
+labels:
+  - type:docs
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for documentation, workflow, and product-coherence issues.
+
+        Keep the issue grounded in:
+        - the current behavior in code and UI
+        - the roadmap in `ROADMAP.md`
+        - the backlog structure in `BACKLOG.md`
+
+  - type: input
+    id: backlog_item
+    attributes:
+      label: Backlog item
+      description: Copy the matching issue title from BACKLOG.md.
+      placeholder: "[P0][docs] Sync CLI docs with actual commands"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options:
+        - Milestone 1 — Core Trust & Product Coherence
+        - Milestone 2 — Workflow Simplification & UX
+        - Milestone 5 — Decision Support & Release Readiness
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Affected surfaces
+      options:
+        - label: README
+        - label: USER_GUIDE
+        - label: INSTALL_GUIDE
+        - label: ROADMAP
+        - label: BACKLOG
+        - label: CLI examples
+        - label: UI workflow
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Explain the documentation or workflow drift being corrected.
+      placeholder: |
+        Some docs still refer to outdated CLI usage patterns while the current CLI uses size, plan, map, report, charts, and sites.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources_to_audit
+    attributes:
+      label: Sources to audit
+      description: List the files, screens, or examples that must be checked.
+      placeholder: |
+        - README.md
+        - USER_GUIDE.md
+        - INSTALL_GUIDE.md
+        - Guided UI workflow copy
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Write the concrete documentation or workflow checklist.
+      placeholder: |
+        - [ ] Remove outdated command examples
+        - [ ] Add canonical examples for the current CLI
+        - [ ] Clarify Quick Sizing vs Planning workflow
+        - [ ] Verify the docs match the actual user journey
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] No main docs contain obsolete CLI examples
+        - [ ] The workflow appears consistently in docs and UI
+        - [ ] A new user can complete the intended flow without reading source code
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots_examples
+    attributes:
+      label: Screenshots or example commands needed
+      description: Note any screenshots, command transcripts, or examples required to close the issue.
+      placeholder: |
+        - Updated CLI example block for rf5g size
+        - Screenshot of the guided UI workflow split
+
+  - type: textarea
+    id: labels_to_apply
+    attributes:
+      label: Labels to apply
+      placeholder: |
+        priority:P0
+        type:docs
+        type:ui
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: The documentation or workflow change matches current product behavior.
+        - label: Any changed examples or instructions are verified against the real CLI/UI flow.
+        - label: Related docs are updated together to avoid drift.
+        - label: CLI, API, and UI messaging stay coherent where they overlap.
+        - label: New assumptions, warnings, or limitations are surfaced clearly where relevant.

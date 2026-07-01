@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Review the roadmap
+    url: https://github.com/nhnam/rf5g-sizing/blob/main/ROADMAP.md
+    about: Use ROADMAP.md for milestone direction and sequencing.
+  - name: Review the backlog
+    url: https://github.com/nhnam/rf5g-sizing/blob/main/BACKLOG.md
+    about: Use BACKLOG.md as the issue catalog and source of Why, Scope, and Acceptance criteria.

@@ -29,6 +29,23 @@
 
 - [Install Guide](INSTALL_GUIDE.md) — Detailed installation instructions
 - [User Guide](USER_GUIDE.md) — How to use the tool
+- [ROADMAP.md](ROADMAP.md) — Milestone direction and sequencing
+- [BACKLOG.md](BACKLOG.md) — Issue catalog for future implementation work
+- [IMPLEMENTATION_LOG.md](IMPLEMENTATION_LOG.md) — Session/sprint progress log and next actions
+
+## Planning and issue tracking
+
+Use the repo planning files together:
+- `ROADMAP.md` defines milestone direction and sequencing
+- `BACKLOG.md` holds issue-ready work items grouped by milestone
+- `.github/ISSUE_TEMPLATE/` holds the GitHub Issue Forms used to create execution/tracking issues from backlog items
+- `.github/tracking-issues/` holds copy/paste-ready milestone tracking issue bodies
+- `IMPLEMENTATION_LOG.md` records session/sprint progress, blockers, and next actions
+
+When opening a new implementation issue, preserve the backlog structure:
+- **Why**
+- **Scope**
+- **Acceptance criteria**
 
 ## Manual Installation (Developers)
 

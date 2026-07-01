@@ -1,0 +1,114 @@
+name: Release / Checklist
+description: Issue form for release readiness, milestone completion, and verification checklists
+title: "[Release] "
+labels:
+  - type:release
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for beta-readiness, release hygiene, and milestone-completion work.
+
+        Keep the issue checklist-oriented and tie it back to the roadmap/backlog rather than turning `BACKLOG.md` into the checklist itself.
+
+  - type: input
+    id: backlog_item
+    attributes:
+      label: Backlog item
+      description: Copy the matching issue title from BACKLOG.md when applicable.
+      placeholder: "[P2][release][docs][test] Prepare beta release checklist"
+
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Milestone
+      options:
+        - Milestone 5 — Decision Support & Release Readiness
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0
+        - P1
+        - P2
+    validations:
+      required: true
+
+  - type: textarea
+    id: release_goal
+    attributes:
+      label: Release or readiness goal
+      description: State the concrete release checkpoint this issue should satisfy.
+      placeholder: |
+        Prepare a beta-readiness checklist covering verification, docs sanity, known limitations, and release notes expectations.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      placeholder: |
+        The project needs an explicit path from alpha toward beta-quality release discipline.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      placeholder: |
+        - [ ] Define the release checklist sections
+        - [ ] Add verification expectations
+        - [ ] Add installer and docs sanity checks
+        - [ ] Add known limitations and sign-off criteria
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification_matrix
+    attributes:
+      label: Verification matrix
+      description: List the checks that must pass before this issue can be closed.
+      placeholder: |
+        - Core regression suite passes
+        - Key docs are current
+        - Installer/startup flow is sanity-checked
+        - Known limitations are documented
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] A repeatable release checklist exists in the repo
+        - [ ] Verification expectations are explicit
+        - [ ] The project has clear criteria for moving beyond alpha
+    validations:
+      required: true
+
+  - type: textarea
+    id: labels_to_apply
+    attributes:
+      label: Labels to apply
+      placeholder: |
+        priority:P2
+        type:release
+        type:docs
+        type:test
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: The checklist is repeatable and usable for future releases.
+        - label: Verification steps are explicit enough for someone returning later to run.
+        - label: Docs, test expectations, and known limitations are aligned.
+        - label: The issue leaves a clear gate for closing the milestone or release checkpoint.
