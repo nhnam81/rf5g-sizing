@@ -154,6 +154,16 @@ class PlacementPlanResult(BaseModel):
     spatial_capacity: Optional[SpatialCapacityResult] = None
 
 
+class ScenarioWarning(BaseModel):
+    """A single warning about scenario validity."""
+    code: str  # e.g., "W001"
+    severity: str  # "info", "warning", "critical"
+    category: str  # "propagation", "throughput", "capacity", "planning", "equipment"
+    message: str
+    detail: str = ""
+    recommendation: str = ""
+
+
 class SizingOutput(BaseModel):
     """Complete output of 5G RF sizing calculation."""
     project_name: str
@@ -178,3 +188,4 @@ class SizingOutput(BaseModel):
     capacity: Optional[CapacityResult] = None
     recommendations: list[str] = Field(default_factory=list)
     placement_plan: Optional[PlacementPlanResult] = None
+    warnings: list[ScenarioWarning] = Field(default_factory=list)

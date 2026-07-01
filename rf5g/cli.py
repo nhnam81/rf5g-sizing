@@ -21,6 +21,7 @@ from .engine.sinr_mapper import map_sinr_to_cqi, calculate_cell_throughput, cove
 from .engine.capacity import calculate_capacity
 from .engine.qos_verifier import verify_qos
 from .engine.recommender import generate_recommendations
+from .engine.warnings import generate_warnings
 from .engine.placement_planner import build_placement_plan, effective_planning_area_km2
 from .viz.coverage_map import (
     generate_coverage_map, generate_interactive_map,
@@ -232,6 +233,22 @@ def _run_sizing(inp: RFSizingInput) -> SizingOutput:
     recs = generate_recommendations(result)
 
     result.recommendations = recs
+
+    # Generate warnings
+    from .models.output_schema import ScenarioWarning
+    warnings_result = generate_warnings(inp, result)
+    result.warnings = [
+        ScenarioWarning(
+            code=w.code,
+            severity=w.severity,
+            category=w.category,
+            message=w.message,
+            detail=w.detail,
+            recommendation=w.recommendation,
+        )
+        for w in warnings_result.warnings
+    ]
+
     return result
 
 @app.command()
@@ -335,6 +352,18 @@ def size(
         console.print("\n[bold yellow]Recommendations:[/bold yellow]")
         for i, rec in enumerate(result.recommendations, 1):
             console.print(f"  {i}. {rec}")
+
+    # Warnings
+    warnings_result = generate_warnings(inp, result)
+    if warnings_result.has_warnings:
+        console.print("\n[bold magenta]⚠️  Scenario Warnings:[/bold magenta]")
+        for w in warnings_result.warnings:
+            severity_style = {
+                "critical": "red",
+                "warning": "yellow",
+                "info": "dim",
+            }.get(w.severity, "white")
+            console.print(f"  [{severity_style}][{w.code}] {w.message}[/{severity_style}]")
 
     # Save output
     if output:
