@@ -200,7 +200,113 @@ async def compare(request: CompareRequest):
             "total_capacity_dl_gbps": r.capacity.total_capacity_dl_gbps if r.capacity else None,
             "total_demand_dl_gbps": r.capacity.total_demand_dl_gbps if r.capacity else None,
         })
-    return {"comparison": comparison, "results": results}
+
+    # Generate comparison highlights
+    highlights = _generate_comparison_highlights(results)
+
+    return {"comparison": comparison, "highlights": highlights, "results": results}
+
+
+def _generate_comparison_highlights(results: list) -> dict:
+    """Generate comparison highlights for decision support.
+
+    Returns:
+        Dictionary with:
+        - winner: scenario name with best overall metrics
+        - tradeoffs: list of tradeoff observations
+        - recommendations: list of recommendations based on comparison
+    """
+    if len(results) < 2:
+        return {"winner": None, "tradeoffs": [], "recommendations": []}
+
+    # Find best scenario by coverage sites (fewer is better)
+    best_coverage = min(results, key=lambda r: r.site_estimate.coverage_sites)
+
+    # Find best scenario by capacity (if applicable)
+    best_capacity = None
+    capacity_scenarios = [r for r in results if r.capacity and r.capacity.capacity_sufficient]
+    if capacity_scenarios:
+        best_capacity = min(capacity_scenarios, key=lambda r: r.capacity.total_sites)
+
+    # Find best SINR
+    best_sinr = max(results, key=lambda r: r.sinr.sinr_db)
+
+    # Generate tradeoffs
+    tradeoffs = []
+
+    # Coverage vs sites tradeoff
+    if len(results) >= 2:
+        r1, r2 = results[0], results[1]
+        site_diff = abs(r1.site_estimate.coverage_sites - r2.site_estimate.coverage_sites)
+        if site_diff > 100:
+            tradeoffs.append(
+                f"Site count varies significantly: {r1.project_name} needs {r1.site_estimate.coverage_sites} sites vs {r2.project_name} needs {r2.site_estimate.coverage_sites} sites"
+            )
+
+    # Band/throughput tradeoff
+    bandwidths = [r.bandwidth_mhz for r in results]
+    if max(bandwidths) != min(bandwidths):
+        tradeoffs.append(
+            f"Bandwidth varies: {min(bandwidths)} MHz to {max(bandwidths)} MHz — higher bandwidth provides more capacity but may have reduced coverage"
+        )
+
+    # Limiting link comparison
+    limiting_links = [r.site_estimate.limiting_link for r in results]
+    if "UL" in limiting_links and "DL" in limiting_links:
+        tradeoffs.append(
+            "Different limiting links across scenarios — some are UL-limited, others DL-limited"
+        )
+
+    # Capacity vs coverage
+    if best_coverage and best_capacity and best_coverage.project_name != best_capacity.project_name:
+        tradeoffs.append(
+            f"Coverage-optimal ({best_coverage.project_name}) differs from capacity-optimal ({best_capacity.project_name})"
+        )
+
+    # Generate recommendations
+    recommendations = []
+
+    if best_coverage.site_estimate.coverage_sites < best_sinr.site_estimate.coverage_sites:
+        recommendations.append(
+            f"{best_coverage.project_name} needs fewer sites but has lower SINR — consider if coverage or signal quality is priority"
+        )
+
+    if best_sinr.sinr_db > best_coverage.sinr.sinr_db + 3:
+        recommendations.append(
+            f"{best_sinr.project_name} has significantly better SINR (+{best_sinr.sinr_db - best_coverage.sinr.sinr_db:.1f} dB) — better for high-throughput services"
+        )
+
+    # Check for capacity constraints
+    capacity_insufficient = [r for r in results if r.capacity and not r.capacity.capacity_sufficient]
+    if capacity_insufficient:
+        recommendations.append(
+            f"{len(capacity_insufficient)} scenario(s) have insufficient capacity — consider adding sites or reducing demand"
+        )
+
+    # Determine overall winner
+    # Score: minimize sites, maximize SINR, ensure capacity
+    def score(r):
+        score = 0
+        # Fewer sites is better
+        score -= r.site_estimate.coverage_sites
+        # Higher SINR is better
+        score += r.sinr.sinr_db
+        # Capacity sufficient is better
+        if r.capacity and r.capacity.capacity_sufficient:
+            score += 100
+        return score
+
+    winner = max(results, key=score)
+
+    return {
+        "winner": winner.project_name,
+        "winner_reason": f"Best overall score based on sites ({winner.site_estimate.coverage_sites}), SINR ({winner.sinr.sinr_db:.1f} dB), and capacity",
+        "tradeoffs": tradeoffs,
+        "recommendations": recommendations,
+        "best_coverage": best_coverage.project_name,
+        "best_capacity": best_capacity.project_name if best_capacity else None,
+        "best_sinr": best_sinr.project_name,
+    }
 
 
 @app.post("/map", tags=["visualization"])

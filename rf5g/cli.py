@@ -583,13 +583,20 @@ def map(
 def report(
     config: Path = typer.Option(None, "--config", "-c", help="Path to JSON config file"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Output path"),
-    format: str = typer.Option("html", "--format", "-f", help="Report format: html, md"),
+    format: str = typer.Option("html", "--format", "-f", help="Report format: html, md, executive, technical"),
     area: Optional[float] = typer.Option(None, "--area", help="Coverage area km2"),
     scenario: Optional[str] = typer.Option(None, "--scenario", help="UMa/UMi/RMa/InH"),
     band: Optional[str] = typer.Option(None, "--band", help="NR band"),
     power: Optional[float] = typer.Option(None, "--power", help="BS TX power W"),
 ):
-    """Generate sizing report (HTML or Markdown)."""
+    """Generate sizing report.
+
+    Formats:
+    - html: Full HTML report (default)
+    - md: Full Markdown report
+    - executive: Executive summary for non-technical stakeholders
+    - technical: Technical appendix with full engineering details
+    """
     if config:
         with open(config) as f:
             data = json.load(f)
@@ -606,6 +613,12 @@ def report(
 
     if format == "md":
         path = generate_markdown_report(result, output or f"rf5g_report_{name}.md")
+    elif format == "executive":
+        from .viz.report import generate_executive_report
+        path = generate_executive_report(result, output or f"rf5g_executive_{name}.md")
+    elif format == "technical":
+        from .viz.report import generate_technical_appendix
+        path = generate_technical_appendix(result, output or f"rf5g_technical_{name}.md")
     else:
         path = generate_html_report(result, output or f"rf5g_report_{name}.html")
     console.print(f"[green]Report saved to {path}[/green]")
